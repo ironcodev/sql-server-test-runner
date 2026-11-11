@@ -210,7 +210,7 @@ const DEFAULT_CONFIG_JSON = `{
   "cleanupBackup": false,
   "testRegex": "(tests/.*|(\\\\.|/)(test|spec))\\\\.sql$",
   "testMatch": "^test_",
-  "testSchema": "",
+  "testSchema": "sstr",
   "assertSchema": "Assert",
   "scripts": {
     "warmUp": "",

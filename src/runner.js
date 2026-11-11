@@ -27,29 +27,16 @@ function resolvePath(cwd, p) {
   return isAbsolute(p) ? p : join(cwd, p);
 }
 
-async function runScriptOnDb(
-  cfg,
-  dbName,
-  scriptPath,
-  { assertSchema, debug } = {},
-) {
+async function runScriptOnDb(cfg, dbName, scriptPath, { assertSchema, debug } = {}) {
   const args = buildConnectionArgs(cfg, { database: dbName });
   if (assertSchema) args.push("-v", `AssertSchema=${assertSchema}`);
   args.push("-i", scriptPath);
   return runSqlcmd(args, { debug });
 }
 
-async function runScriptTextOnDb(
-  cfg,
-  dbName,
-  scriptText,
-  { assertSchema, debug } = {},
-) {
+async function runScriptTextOnDb(cfg, dbName, scriptText, { assertSchema, debug } = {}) {
   // Write the script to a temporary file so sqlcmd can handle GO batches.
-  const tmpFile = join(
-    tmpdir(),
-    `sstr_assert_${Date.now()}_${Math.random().toString(36).slice(2)}.sql`,
-  );
+  const tmpFile = join(tmpdir(), `sstr_assert_${Date.now()}_${Math.random().toString(36).slice(2)}.sql`);
   await writeFile(tmpFile, scriptText, "utf-8");
   try {
     const args = buildConnectionArgs(cfg, { database: dbName });
@@ -65,15 +52,17 @@ async function runScriptTextOnDb(
   }
 }
 
-function isTestProcedure(fullName, { assertSchema, testSchema, testMatch }) {
+function isTestProcedure(fullName, { assertSchema, testSchemas, testMatch }) {
   const parts = fullName.split(".");
   const name = parts[parts.length - 1];
   const schema = parts.length > 1 ? parts.slice(0, -1).join(".") : "dbo";
 
-  if (assertSchema && schema.toLowerCase() === assertSchema.toLowerCase())
+  if (assertSchema && schema.toLowerCase() === assertSchema.toLowerCase()) {
     return false;
-  if (testSchema && schema.toLowerCase() === testSchema.toLowerCase())
+  }
+  if (testSchemas && testSchemas.has(schema.toLowerCase())) {
     return true;
+  }
   return testMatch.test(name);
 }
 
@@ -95,7 +84,12 @@ export async function run(
   } = {},
 ) {
   const assertSchema = cfg.assertSchema || DEFAULT_ASSERT_SCHEMA;
-  const testSchema = cfg.testSchema || null;
+  const testSchemas = new Set(
+    (cfg.testSchema || "")
+      .split(",")
+      .map((s) => s && s.trim().toLowerCase())
+      .filter(Boolean),
+  );
   const testMatch = new RegExp(cfg.testMatch || DEFAULT_TEST_MATCH, "i");
   const reporter = createReporter(reportType, { color });
   const debug = detailed === true;
@@ -131,27 +125,20 @@ export async function run(
     }
     const rand = Math.floor(Math.random() * 1e6);
     targetDb = `${testDb}_sstr_${rand}`;
-    progressLogger.log(
-      `Backing up "${testDb}" and restoring as "${targetDb}"...`,
-    );
+    progressLogger.log(`Backing up "${testDb}" and restoring as "${targetDb}"...`);
     backupFile = await backupAndRestore(cfg, testDb, targetDb, { debug });
     progressLogger.log("Restore completed.");
   }
 
   try {
     progressLogger.log("Creating assertion procedures...");
-    const assertSql = await readFile(
-      join(__dirname, "assert-script.sql"),
-      "utf-8",
-    );
+    const assertSql = await readFile(join(__dirname, "assert-script.sql"), "utf-8");
     const assertRes = await runScriptTextOnDb(cfg, targetDb, assertSql, {
       assertSchema,
       debug: false,
     });
     if (assertRes.code !== 0) {
-      throw new Error(
-        `Failed to deploy assertion procedures:\n${assertRes.stderr || assertRes.stdout}`,
-      );
+      throw new Error(`Failed to deploy assertion procedures:\n${assertRes.stderr || assertRes.stdout}`);
     }
     progressLogger.log("Assertion procedures created.");
 
@@ -186,9 +173,7 @@ export async function run(
           debug,
         });
         if (res.code !== 0) {
-          throw new Error(
-            `preScript failed for "${file}":\n${res.stderr || res.stdout}`,
-          );
+          throw new Error(`preScript failed for "${file}":\n${res.stderr || res.stdout}`);
         }
       }
 
@@ -213,9 +198,7 @@ export async function run(
         const current = await listStoredProcedures(cfg, targetDb, { debug });
         const currentSet = new Set(current);
         const newOnes = [...currentSet].filter((p) => !testedProcedures.has(p));
-        const testProcs = newOnes.filter((full) =>
-          isTestProcedure(full, { assertSchema, testSchema, testMatch }),
-        );
+        const testProcs = newOnes.filter((full) => isTestProcedure(full, { assertSchema, testSchemas, testMatch }));
 
         for (const full of testProcs) {
           const t1 = nowMs();
@@ -248,9 +231,7 @@ export async function run(
           debug,
         });
         if (postRes.code !== 0) {
-          throw new Error(
-            `postScript failed for "${file}":\n${postRes.stderr || postRes.stdout}`,
-          );
+          throw new Error(`postScript failed for "${file}":\n${postRes.stderr || postRes.stdout}`);
         }
       }
     }
@@ -274,9 +255,7 @@ export async function run(
       try {
         await dropDatabase(cfg, targetDb, { debug });
       } catch (e) {
-        progressLogger.error(
-          `Failed to drop database "${targetDb}": ${e.message}`,
-        );
+        progressLogger.error(`Failed to drop database "${targetDb}": ${e.message}`);
       }
 
       if (backupFile && cfg.cleanupBackup === true) {
@@ -284,9 +263,7 @@ export async function run(
           await unlink(backupFile);
           progressLogger.log(`Removed backup file: ${backupFile}`);
         } catch (e) {
-          progressLogger.error(
-            `Failed to remove backup file "${backupFile}": ${e.message}`,
-          );
+          progressLogger.error(`Failed to remove backup file "${backupFile}": ${e.message}`);
         }
       }
     } else {

@@ -14,7 +14,7 @@
   "cleanupBackup": true,
   "testRegex": "(tests/.*|(\\.|/)(test|spec))\\.sql$",
   "testMatch": "^test_",
-  "testSchema": "sstr_tests",
+  "testSchema": "sstr",
   "assertSchema": "Assert",
   "scripts": {
     "warmUp": "tests/warmup.sql",
