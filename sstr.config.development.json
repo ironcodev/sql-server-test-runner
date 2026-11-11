@@ -1,0 +1,8 @@
+{
+  "connection": {
+    "server": "dev-sql.example.com",
+    "trustedConnection": false,
+    "username": "test_user",
+    "password": "secret"
+  }
+}

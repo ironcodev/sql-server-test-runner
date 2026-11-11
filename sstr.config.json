@@ -1,0 +1,26 @@
+{
+  "connection": {
+    "server": "localhost",
+    "username": "",
+    "password": "",
+    "trustedConnection": true,
+    "encrypt": false,
+    "trustServerCertificate": true
+  },
+  "loginTimeout": 15,
+  "queryTimeout": 180,
+  "testDb": "my_test_db",
+  "backupPath": "C:/sstr-backups",
+  "cleanupBackup": true,
+  "testRegex": "(tests/.*|(\\.|/)(test|spec))\\.sql$",
+  "testMatch": "^test_",
+  "testSchema": "sstr_tests",
+  "assertSchema": "Assert",
+  "scripts": {
+    "warmUp": "tests/warmup.sql",
+    "coolDown": "tests/cooldown.sql"
+  },
+  "sqlCmdOptions": {
+    "enableQuotedIdentifiers": true
+  }
+}

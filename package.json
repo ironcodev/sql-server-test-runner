@@ -1,0 +1,38 @@
+{
+  "name": "sql-server-test-runner",
+  "version": "1.0.0",
+  "description": "A simple test runner for SQL Server databases that executes .sql scripts containing sp unit tests using sqlcmd and reports failed sp executions.",
+  "main": "src/index.js",
+  "bin": {
+    "sstr": "./bin/sstr.js"
+  },
+  "type": "module",
+  "scripts": {
+    "test": "node bin/sstr.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ironcodev/sql-server-test-runner.git"
+  },
+  "keywords": [
+    "sqlcmd",
+    "sql",
+    "test-runner",
+    "ssdt"
+  ],
+  "files": [
+    "bin",
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "author": "IronCode",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ironcodev/sql-server-test-runner/issues"
+  },
+  "homepage": "https://github.com/ironcodev/sql-server-test-runner#readme",
+  "engines": {
+    "node": ">=18"
+  }
+}
