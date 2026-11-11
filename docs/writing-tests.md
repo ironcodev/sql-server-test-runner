@@ -4,12 +4,33 @@ A test file is a plain `.sql` script that creates one or more stored procedures.
 
 ## Naming
 
-- Test procedures must be named so that their **bare name** (without schema) matches `testMatch`. The default is `^test.*$`.
-- Recommended convention: `test_<subject>_should_<expectation>`.
-  ```sql
-  create or alter proc test_sum_should_return_zero_for_null_values ...
-  create or alter proc test_sum_should_return_sum_of_values ...
-  ```
+You have two options for telling `sstr` which procedures are tests.
+
+### Option 1: prefix with `test_` (default)
+
+Procedures whose **bare name** matches `testMatch` (default `^test_`) are tests, regardless of their schema.
+
+\`\`\`sql
+create or alter proc test_sum_should_return_sum_of_values ...
+\`\`\`
+
+### Option 2: put them in the `sstr` schema
+
+`sstr init` sets `testSchema` to `"sstr"`, and the assertion script creates that schema. Any procedure in the `sstr` schema is treated as a test, without needing a `test_` prefix.
+
+\`\`\`sql
+create or alter proc sstr.sum_should_return_sum_of_values ...
+\`\`\`
+
+You can list multiple schemas, separated by commas:
+
+\`\`\`json
+{
+  "testSchema": "sstr, integration_tests"
+}
+\`\`\`
+
+Procedures in `assertSchema` (default `Assert`) are always excluded.
 
 ## No parameters
 

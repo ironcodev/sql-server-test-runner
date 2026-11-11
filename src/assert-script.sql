@@ -9,6 +9,10 @@ if not exists (select 1 from sys.schemas where name = '$(AssertSchema)')
     exec('create schema $(AssertSchema)');
 go
 
+if not exists (select 1 from sys.schemas where name = 'sstr')
+    exec('create schema sstr');
+go
+
 -- ============================================================
 -- Boolean / null / numeric / empty
 -- ============================================================

@@ -55,7 +55,7 @@ Validation rules:
 | `cleanupBackup` | boolean | `false` | If `true`, delete the `.bak` file after the run (only when the database was dropped). |
 | `testRegex` | string | `(tests/.*\|(\\\\.\|/)(test\|spec))\\\\.sql$` | Regex matched against the **relative path** of each `.sql` file. |
 | `testMatch` | string | `^test.*$` | Regex matched against the **bare procedure name**. Ignored for procedures inside `testSchema`. |
-| `testSchema` | string (comma-separated) | — | If set, **all** procedures in these schemas are treated as tests, regardless of `testMatch`. |
+| `testSchema` | string | — | Comma-separated list of schemas. If set, **all** procedures in these schemas are treated as tests, regardless of `testMatch`. Whitespace around names is ignored. `sstr init` sets this to `"sstr"` by default, so you can put test procedures in the `sstr` schema without prefixing them with `test_`. Example: `"sstr, integration_tests"`. |
 | `assertSchema` | string | `Assert` | Schema where assertion procedures are installed. Procedures in this schema are **excluded** from test discovery. |
 
 ### `scripts`

@@ -50,9 +50,11 @@ sstr run --report-type junit --no-color --bail > report.xml
 
 Creates a starter `sstr.config.json` in the current directory. Fails if the file already exists.
 
-```bash
+The generated config sets `testSchema` to `"sstr"`. The assertion script creates the `sstr` schema in the test database, so you can put test procedures there without a `test_` prefix.
+
+\`\`\`bash
 sstr init
-```
+\`\`\`
 
 ### `sstr list`
 

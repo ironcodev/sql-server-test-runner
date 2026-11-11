@@ -75,8 +75,8 @@ This creates `sstr.config.json` with sensible defaults. Edit the `connection` se
     "trustServerCertificate": true
   },
   "testDb": "my_test_db",
-  "testRegex": "(tests/.*|(\\\\.|/)(test|spec))\\\\.sql$",
   "testMatch": "^test_",
+  "testSchema": "sstr",
   "assertSchema": "Assert"
 }
 ```
