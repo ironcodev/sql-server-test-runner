@@ -56,14 +56,25 @@ All parameters are `sql_variant` so you can pass native values (`int`, `decimal`
 |---|---|---|
 | `TableExists` | `@table` | table does not exist. |
 | `TableNotExists` | `@table` | table exists. |
-| `ColumnExists` | `@table, @column` | column does not exist on the table. |
-| `ColumnNotExists` | `@table, @column` | column exists on the table. |
-| `ForeignKeyExists` | `@table, @fkName` | foreign key does not exist on the table. |
-| `ForeignKeyNotExists` | `@table, @fkName` | foreign key exists on the table. |
-| `DefaultExists` | `@table, @column` | column has no default constraint. |
-| `DefaultNotExists` | `@table, @column` | column has a default constraint. |
+| `ColumnExists` | `@table_column` | column does not exist. `@table_column` is `schema.table.column`, e.g. `'dbo.Users.email'`. |
+| `ColumnNotExists` | `@table_column` | column exists. |
+| `ForeignKeyExists` | `@fk_column, @pk_column` | no foreign key from `@fk_column` to `@pk_column` exists. Both are `schema.table.column`. |
+| `ForeignKeyExists` | `@fk_column, @pk_column` | no foreign key from `@fk_column` to `@pk_column` exists. Each argument is `schema.table.(col1,col2,...)`. |
+| `ForeignKeyNotExists` | `@fk_column, @pk_column` | a foreign key from `@fk_column` to `@pk_column` exists. |
+| `DefaultExists` | `@table_column, @expected_value = null` | the column has no default constraint, or its value does not match `@expected_value`. |
+| `DefaultNotExists` | `@table_column, @expected_value = null` | the column has a default constraint (and, if `@expected_value` is provided, its value matches). |
 
-`@table` should be a schema-qualified name, e.g. `dbo.Users`.
+`@table_column` is `schema.table.column` (e.g. `'dbo.Users.email'`). `@fk_column` is the column that holds the foreign key, `@pk_column` is the referenced column.
+
+#### Default value comparison
+
+`DefaultExists` and `DefaultNotExists` compare the default constraint's definition with `@expected_value`. Before comparing:
+
+- Both strings are trimmed.
+- Wrapping parentheses are removed repeatedly, so `((10))` and `(10)` both become `10`.
+- The comparison uses the database collation (usually case-insensitive).
+
+If `@expected_value` is `null`, only the **presence** of the default constraint is checked.
 
 ### Records
 
@@ -97,13 +108,27 @@ exec Assert.IsNull @maybeNull;
 exec Assert.IsNotNull @result;
 
 -- Schema
-exec Assert.TableExists 'dbo.Users';
-exec Assert.ColumnExists 'dbo.Users', 'email';
-exec Assert.ForeignKeyExists 'dbo.Orders', 'FK_Orders_Users';
-exec Assert.DefaultExists 'dbo.Users', 'createdAt';
+exec Assert.TableExists      'dbo.Users';
+exec Assert.ColumnExists     'dbo.Users.email';
 
 -- Records
 exec Assert.RecordExists 'dbo.Users', N'{ "id": 10 }';
+
+-- Defaults
+exec Assert.DefaultExists    'dbo.Users.createdAt';                    -- only presence
+exec Assert.DefaultExists    'dbo.Users.status', 'active';             -- presence + value
+exec Assert.DefaultExists    'dbo.Users.age', '10';                    -- matches '((10))' or '(10)'
+exec Assert.DefaultNotExists 'dbo.Users.updatedAt';                    -- no default at all
+exec Assert.DefaultNotExists 'dbo.Users.status', 'inactive';           -- no default with this value
+
+-- Foreign Keys
+-- Single-column foreign key
+exec Assert.ForeignKeyExists    'dbo.Orders.UserId', 'dbo.Users.Id';
+exec Assert.ForeignKeyNotExists 'dbo.Orders.UserId', 'dbo.Users.Id';
+
+-- Composite foreign key (note the parentheses)
+exec Assert.ForeignKeyExists    'dbo.ChildTable.(Col1,Col2)', 'dbo.ParentTable.(Col1,Col2)';
+exec Assert.ForeignKeyNotExists 'dbo.ChildTable.(Col1,Col2)', 'dbo.ParentTable.(Col1,Col2)';
 ```
 
 ## Limitations

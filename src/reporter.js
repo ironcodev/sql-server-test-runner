@@ -13,7 +13,7 @@ const COLORS = {
 };
 
 function makeColorizer(enabled) {
-  if (!enabled) return (s) => s;
+  if (!enabled) return () => (s) => s;
   return (color, s) => `${COLORS[color] || ""}${s}${COLORS.reset}`;
 }
 
@@ -33,8 +33,15 @@ class BaseReporter {
     this.files = files;
   }
 
-  addResult({ file, procedure, passed, error, durationMs = null }) {
-    this.results.push({ file, procedure, passed, error, durationMs });
+  addResult({ file, procedure, passed, error, durationMs = null, skipped = false }) {
+    this.results.push({
+      file,
+      procedure,
+      passed,
+      error,
+      durationMs,
+      skipped,
+    });
   }
 
   markFileSkipped(file, reason) {
@@ -42,7 +49,7 @@ class BaseReporter {
   }
 
   get hasFailures() {
-    return this.results.some((r) => !r.passed);
+    return this.results.some((r) => !r.passed && !r.skipped);
   }
 
   print() {
@@ -51,7 +58,7 @@ class BaseReporter {
 }
 
 // ============================================================
-// Console reporter (human readable, colored)
+// Console reporter
 // ============================================================
 
 export class ConsoleReporter extends BaseReporter {
@@ -73,12 +80,13 @@ export class ConsoleReporter extends BaseReporter {
     console.log("Per-file details:");
     for (const f of this.files) {
       const list = byFile.get(f) || [];
-      const pass = list.filter((x) => x.passed).length;
-      const fail = list.length - pass;
-      const badge = fail > 0 ? c("red", "FAIL") : c("green", "PASS");
+      const skipped = list.filter((x) => x.skipped).length;
+      const pass = list.filter((x) => x.passed && !x.skipped).length;
+      const fail = list.filter((x) => !x.passed && !x.skipped).length;
+      const badge = fail > 0 ? c("red", "FAIL") : list.length > 0 ? c("green", "PASS") : c("gray", "EMPTY");
       console.log(`  - ${f} [${badge}]`);
       console.log(
-        `      procedures: ${list.length}, pass: ${pass}, fail: ${fail}`,
+        `      procedures: ${list.length}, pass: ${pass}, fail: ${fail}${skipped ? `, skipped: ${skipped}` : ""}`,
       );
     }
 
@@ -91,7 +99,7 @@ export class ConsoleReporter extends BaseReporter {
       }
     }
 
-    const failures = this.results.filter((r) => !r.passed);
+    const failures = this.results.filter((r) => !r.passed && !r.skipped);
     if (failures.length > 0) {
       console.log("");
       console.log(c("red", "Failure details:"));
@@ -104,40 +112,42 @@ export class ConsoleReporter extends BaseReporter {
     }
 
     const total = this.results.length;
-    const passed = this.results.filter((r) => r.passed).length;
-    const failed = total - passed;
+    const skipped = this.results.filter((r) => r.skipped).length;
+    const passed = this.results.filter((r) => r.passed && !r.skipped).length;
+    const failed = this.results.filter((r) => !r.passed && !r.skipped).length;
 
     console.log("----------------------------------------------");
     const passLabel = c("green", `pass: ${passed}`);
-    const failLabel =
-      failed > 0 ? c("red", `fail: ${failed}`) : c("gray", `fail: ${failed}`);
-    console.log(`Total: ${total}, ${passLabel}, ${failLabel}`);
+    const failLabel = failed > 0 ? c("red", `fail: ${failed}`) : c("gray", `fail: ${failed}`);
+    const skipLabel = skipped > 0 ? `, skipped: ${skipped}` : "";
+    console.log(`Total: ${total}, ${passLabel}, ${failLabel}${skipLabel}`);
     console.log(c("cyan", "=============================================="));
   }
 }
 
 // ============================================================
-// JSON reporter (machine readable)
+// JSON reporter
 // ============================================================
 
 export class JsonReporter extends BaseReporter {
   print() {
     const total = this.results.length;
-    const passed = this.results.filter((r) => r.passed).length;
-    const failed = total - passed;
+    const skipped = this.results.filter((r) => r.skipped).length;
+    const passed = this.results.filter((r) => r.passed && !r.skipped).length;
+    const failed = this.results.filter((r) => !r.passed && !r.skipped).length;
 
     const payload = {
       files: this.files,
       skippedFiles: this.skippedFiles,
       results: this.results,
-      summary: { total, passed, failed },
+      summary: { total, passed, failed, skipped },
     };
     process.stdout.write(JSON.stringify(payload, null, 2) + "\n");
   }
 }
 
 // ============================================================
-// JUnit reporter (CI friendly)
+// JUnit reporter
 // ============================================================
 
 function escapeXml(s) {
@@ -152,11 +162,12 @@ function escapeXml(s) {
 export class JUnitReporter extends BaseReporter {
   print() {
     const total = this.results.length;
-    const failed = this.results.filter((r) => !r.passed).length;
+    const failed = this.results.filter((r) => !r.passed && !r.skipped).length;
+    const skipped = this.results.filter((r) => r.skipped).length;
 
     const lines = [];
     lines.push('<?xml version="1.0" encoding="UTF-8"?>');
-    lines.push(`<testsuites name="sstr" tests="${total}" failures="${failed}">`);
+    lines.push(`<testsuites name="sstr" tests="${total}" failures="${failed}" skipped="${skipped}">`);
 
     const byFile = new Map();
     for (const r of this.results) {
@@ -165,22 +176,18 @@ export class JUnitReporter extends BaseReporter {
     }
 
     for (const [file, list] of byFile) {
-      const fileFail = list.filter((x) => !x.passed).length;
+      const fileFail = list.filter((x) => !x.passed && !x.skipped).length;
+      const fileSkip = list.filter((x) => x.skipped).length;
       lines.push(
-        `  <testsuite name="${escapeXml(file)}" tests="${list.length}" failures="${fileFail}">`,
+        `  <testsuite name="${escapeXml(file)}" tests="${list.length}" failures="${fileFail}" skipped="${fileSkip}">`,
       );
       for (const r of list) {
-        const time =
-          r.durationMs != null ? (r.durationMs / 1000).toFixed(3) : "0.000";
-        lines.push(
-          `    <testcase classname="${escapeXml(file)}" name="${escapeXml(
-            r.procedure,
-          )}" time="${time}">`,
-        );
-        if (!r.passed) {
-          lines.push(
-            `      <failure message="test failed"><![CDATA[${r.error || ""}]]></failure>`,
-          );
+        const time = r.durationMs != null ? (r.durationMs / 1000).toFixed(3) : "0.000";
+        lines.push(`    <testcase classname="${escapeXml(file)}" name="${escapeXml(r.procedure)}" time="${time}">`);
+        if (r.skipped) {
+          lines.push("      <skipped/>");
+        } else if (!r.passed) {
+          lines.push(`      <failure message="test failed"><![CDATA[${r.error || ""}]]></failure>`);
         }
         lines.push("    </testcase>");
       }

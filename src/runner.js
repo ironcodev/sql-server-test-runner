@@ -14,6 +14,7 @@ import {
 } from "./database.js";
 import { discoverTestFiles } from "./discover.js";
 import { createReporter } from "./reporter.js";
+import { loadTestOptions, resolveOptions, toBool, normalizeThrows } from "./options.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -27,20 +28,66 @@ function resolvePath(cwd, p) {
   return isAbsolute(p) ? p : join(cwd, p);
 }
 
-async function runScriptOnDb(cfg, dbName, scriptPath, { assertSchema, debug } = {}) {
-  const args = buildConnectionArgs(cfg, { database: dbName });
-  if (assertSchema) args.push("-v", `AssertSchema=${assertSchema}`);
-  args.push("-i", scriptPath);
-  return runSqlcmd(args, { debug });
+/**
+ * Extracts the SQL Server error number from sqlcmd output.
+ * Example: "Msg 8134, Level 16, State 1, ..." -> 8134
+ */
+function extractSqlErrorNumber(text) {
+  if (!text) return null;
+  const match = text.match(/Msg\s+(\d+)/i);
+  return match ? Number(match[1]) : null;
+}
+
+async function runScriptOnDb(cfg, dbName, scriptPath, { assertSchema, debug, testSuite } = {}) {
+  // Read the original script.
+  let scriptText;
+  try {
+    scriptText = await readFile(scriptPath, "utf-8");
+  } catch (e) {
+    throw new Error(`Failed to read "${scriptPath}": ${e.message}`);
+  }
+
+  // Prepend :setvar directives so sqlcmd resolves $(AssertSchema) and
+  // $(TestSuite) without relying on -v (which mishandles Windows paths).
+  const lines = [];
+  if (assertSchema) {
+    lines.push(`:setvar AssertSchema "${assertSchema}"`);
+  }
+  if (testSuite) {
+    lines.push(`:setvar TestSuite "${testSuite}"`);
+  }
+  lines.push("");
+  lines.push(scriptText);
+
+  const tmpFile = join(tmpdir(), `sstr_script_${Date.now()}_${Math.random().toString(36).slice(2)}.sql`);
+  await writeFile(tmpFile, lines.join("\n"), "utf-8");
+
+  try {
+    const args = buildConnectionArgs(cfg, { database: dbName });
+    args.push("-i", tmpFile);
+    return await runSqlcmd(args, { debug });
+  } finally {
+    try {
+      await unlink(tmpFile);
+    } catch {
+      // ignore
+    }
+  }
 }
 
 async function runScriptTextOnDb(cfg, dbName, scriptText, { assertSchema, debug } = {}) {
-  // Write the script to a temporary file so sqlcmd can handle GO batches.
+  const lines = [];
+  if (assertSchema) {
+    lines.push(`:setvar AssertSchema "${assertSchema}"`);
+  }
+  lines.push("");
+  lines.push(scriptText);
+
   const tmpFile = join(tmpdir(), `sstr_assert_${Date.now()}_${Math.random().toString(36).slice(2)}.sql`);
-  await writeFile(tmpFile, scriptText, "utf-8");
+  await writeFile(tmpFile, lines.join("\n"), "utf-8");
+
   try {
     const args = buildConnectionArgs(cfg, { database: dbName });
-    if (assertSchema) args.push("-v", `AssertSchema=${assertSchema}`);
     args.push("-i", tmpFile);
     return await runSqlcmd(args, { debug });
   } finally {
@@ -84,24 +131,45 @@ export async function run(
   } = {},
 ) {
   const assertSchema = cfg.assertSchema || DEFAULT_ASSERT_SCHEMA;
+  const testMatch = new RegExp(cfg.testMatch || DEFAULT_TEST_MATCH, "i");
+
+  // testSchema may be a single schema name or a comma-separated list.
+  // Always include the "sstr" schema created by the assertion script.
   const testSchemas = new Set(
     (cfg.testSchema || "")
       .split(",")
-      .map((s) => s && s.trim().toLowerCase())
+      .map((s) => s.trim().toLowerCase())
       .filter(Boolean),
   );
-  const testMatch = new RegExp(cfg.testMatch || DEFAULT_TEST_MATCH, "i");
+  testSchemas.add("sstr");
+
+  const configDefaults = cfg.defaultTestOptions || {};
+
+  // CLI --no-transaction overrides `transaction` for every test.
+  const cliOverrides = useTransaction === false ? { transaction: false } : {};
+
   const reporter = createReporter(reportType, { color });
   const debug = detailed === true;
 
   // For JSON/JUnit reporters, keep stdout clean; route progress to stderr.
-  const progressLogger =
-    reportType === "console"
-      ? logger
-      : {
-          log: (...a) => console.error(...a),
-          error: (...a) => console.error(...a),
-        };
+  const progressLogger = {
+    log: (...a) => {
+      if (debug) {
+        if (reportType === "console") {
+          logger.log(...a);
+        } else {
+          console.error(...a);
+        }
+      }
+    },
+    error: (...a) => {
+      if (reportType === "console") {
+        logger.error(...a);
+      } else {
+        console.error(...a);
+      }
+    },
+  };
 
   progressLogger.log("Checking connection to the server...");
   await checkConnection(cfg, { debug });
@@ -178,10 +246,23 @@ export async function run(
       }
 
       progressLogger.log(`Running test script: ${file}`);
+
+      // Load per-file options (JSON next to the .sql file).
+      let optionsBundle;
+      try {
+        optionsBundle = await loadTestOptions(file);
+      } catch (e) {
+        throw e;
+      }
+      for (const w of optionsBundle.warnings) {
+        progressLogger.error(`[sstr] Warning: ${w}`);
+      }
+
       const t0 = nowMs();
       const res = await runScriptOnDb(cfg, targetDb, file, {
         assertSchema,
         debug,
+        testSuite: file,
       });
       const tFile = nowMs() - t0;
 
@@ -201,19 +282,97 @@ export async function run(
         const testProcs = newOnes.filter((full) => isTestProcedure(full, { assertSchema, testSchemas, testMatch }));
 
         for (const full of testProcs) {
+          const bareName = full.split(".").pop().toLowerCase();
+          const testOpts = optionsBundle.tests.get(bareName) || {};
+
+          const effective = resolveOptions({
+            configDefaults,
+            fileOptions: optionsBundle.options,
+            testOptions: testOpts,
+            cliOverrides,
+          });
+
+          const useTran = toBool(effective.transaction, true);
+          const logExec = toBool(effective.logExecution, false);
+          const skipTest = toBool(effective.skip, false);
+          const expectedThrow = normalizeThrows(effective.throws);
+          const testTimeout = effective.timeout != null ? Number(effective.timeout) : null;
+
+          if (skipTest) {
+            reporter.addResult({
+              file,
+              procedure: full,
+              passed: true,
+              error: null,
+              durationMs: 0,
+              skipped: true,
+            });
+            testedProcedures.add(full);
+            continue;
+          }
+
+          if (effective.preScript) {
+            const p = resolvePath(cwd, effective.preScript);
+            const preRes = await runScriptOnDb(cfg, targetDb, p, {
+              assertSchema,
+              debug,
+            });
+            if (preRes.code !== 0) {
+              throw new Error(`preScript for "${full}" failed:\n${preRes.stderr || preRes.stdout}`);
+            }
+          }
+
           const t1 = nowMs();
           const execRes = await executeTestProcedure(cfg, targetDb, full, {
             debug,
-            useTransaction,
+            useTransaction: useTran,
+            queryTimeout: testTimeout,
           });
           const t2 = nowMs() - t1;
-          const passed = execRes.code === 0;
+
+          if (effective.postScript) {
+            const p = resolvePath(cwd, effective.postScript);
+            const postRes = await runScriptOnDb(cfg, targetDb, p, {
+              assertSchema,
+              debug,
+            });
+            if (postRes.code !== 0) {
+              throw new Error(`postScript for "${full}" failed:\n${postRes.stderr || postRes.stdout}`);
+            }
+          }
+
+          const succeeded = execRes.code === 0;
+          const errorText = (execRes.stderr || execRes.stdout || "").trim();
+
+          let passed;
+          let resultError = null;
+
+          if (expectedThrow === false) {
+            passed = succeeded;
+            if (!passed) resultError = errorText;
+          } else if (expectedThrow === true) {
+            passed = !succeeded;
+            if (!passed) {
+              resultError = "Expected an error, but the test succeeded.";
+            }
+          } else {
+            const errorNumber = extractSqlErrorNumber(errorText);
+            passed = !succeeded && errorNumber === expectedThrow;
+            if (!passed) {
+              if (succeeded) {
+                resultError = `Expected error ${expectedThrow}, but the test succeeded.`;
+              } else if (errorNumber !== expectedThrow) {
+                resultError = `Expected error ${expectedThrow}, got ${errorNumber ?? "unknown"}.\n${errorText}`;
+              }
+            }
+          }
+
           reporter.addResult({
             file,
             procedure: full,
             passed,
-            error: passed ? null : execRes.stderr || execRes.stdout,
-            durationMs: t2,
+            error: resultError,
+            durationMs: logExec ? t2 : null,
           });
           testedProcedures.add(full);
 

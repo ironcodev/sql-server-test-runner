@@ -20,24 +20,20 @@ async function fileExists(path) {
  * - If `configPath` is provided, it is used as the base config.
  *   The env-specific file is looked up next to the base config:
  *   `<baseDir>/sstr.config.{env}.json`.
- * - The fields connection/scripts/sqlCmdOptions are shallow-merged.
+ * - The fields connection/scripts/sqlCmdOptions/defaultTestOptions are
+ *   shallow-merged.
  */
 export async function loadConfig(cwd, env, { configPath } = {}) {
-  const basePath = configPath
-    ? isAbsolute(configPath)
-      ? configPath
-      : join(cwd, configPath)
-    : join(cwd, BASE_CONFIG);
+  const basePath = configPath ? (isAbsolute(configPath) ? configPath : join(cwd, configPath)) : join(cwd, BASE_CONFIG);
 
   if (!(await fileExists(basePath))) {
     throw new Error(`Config file "${basePath}" not found.`);
   }
 
   const baseDir = configPath
-    ? (isAbsolute(configPath) ? configPath : join(cwd, configPath)).replace(
-        /[\\/][^\\/]+$/,
-        "",
-      )
+    ? isAbsolute(configPath)
+      ? configPath.replace(/[\\/][^\\/]+$/, "")
+      : join(cwd, configPath).replace(/[\\/][^\\/]+$/, "")
     : cwd;
 
   const envPath = env ? join(baseDir, `sstr.config.${env}.json`) : null;
@@ -52,7 +48,7 @@ export async function loadConfig(cwd, env, { configPath } = {}) {
   const merged = { ...base };
   for (const key of Object.keys(overrides)) {
     if (
-      ["connection", "scripts", "sqlCmdOptions"].includes(key) &&
+      ["connection", "scripts", "sqlCmdOptions", "defaultTestOptions"].includes(key) &&
       base[key] &&
       typeof base[key] === "object" &&
       typeof overrides[key] === "object"
@@ -88,10 +84,7 @@ export function validateConfig(cfg) {
     throw new Error('"connection.server" is required.');
   }
 
-  const trusted =
-    conn.trustedConnection === true ||
-    conn.trustedConnection === "true" ||
-    conn.trustedConnection === 1;
+  const trusted = conn.trustedConnection === true || conn.trustedConnection === "true" || conn.trustedConnection === 1;
 
   if (!trusted) {
     if (conn.username && typeof conn.username !== "string") {
@@ -111,8 +104,17 @@ export function validateConfig(cfg) {
   if (cfg.assertSchema != null && typeof cfg.assertSchema !== "string") {
     throw new Error('"assertSchema" must be a string.');
   }
-  if (cfg.testSchema != null && typeof cfg.testSchema !== "string") {
-    throw new Error('"testSchema" must be a string.');
+  if (cfg.testSchema != null) {
+    if (typeof cfg.testSchema !== "string") {
+      throw new Error('"testSchema" must be a string.');
+    }
+    const parts = cfg.testSchema
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parts.length === 0) {
+      throw new Error('"testSchema" must contain at least one schema name.');
+    }
   }
   if (cfg.testRegex != null && typeof cfg.testRegex !== "string") {
     throw new Error('"testRegex" must be a string.');
@@ -128,6 +130,11 @@ export function validateConfig(cfg) {
   }
   if (cfg.cleanupBackup != null && typeof cfg.cleanupBackup !== "boolean") {
     throw new Error('"cleanupBackup" must be a boolean.');
+  }
+  if (cfg.defaultTestOptions != null) {
+    if (typeof cfg.defaultTestOptions !== "object" || Array.isArray(cfg.defaultTestOptions)) {
+      throw new Error('"defaultTestOptions" must be an object.');
+    }
   }
   if (cfg.scripts && typeof cfg.scripts === "object") {
     for (const k of ["warmUp", "coolDown", "preScript", "postScript"]) {

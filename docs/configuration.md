@@ -71,6 +71,21 @@ All optional. Each value is a path to a `.sql` file, relative to `--cwd`.
 
 If a configured script path does not exist, the run aborts with an error.
 
+### \`defaultTestOptions\`
+
+Default per-test options applied to every test before the per-file JSON options.
+Same shape as the \`options\` object in per-file JSON files.
+
+\`\`\`json
+{
+  "defaultTestOptions": {
+    "logExecution": true
+  }
+}
+\`\`\`
+
+Priority: \`defaultTestOptions\` < per-file \`options\` < per-test \`tests.<name>\` < CLI.
+
 ### `sqlCmdOptions`
 
 All optional. Each key maps to a `sqlcmd` switch.

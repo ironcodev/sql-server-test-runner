@@ -126,3 +126,26 @@ This is a known Node.js bug on Windows (versions 23–25) that can appear when a
 - `sstr run --detailed-report` — every `sqlcmd` command and its raw output.
 - `sstr config --env development` — the final merged config.
 - `sstr run --keep-db` — inspect the test database after the run. Clean up with `sstr clean --yes`.
+
+## Invalid JSON in per-test options
+
+If \`sstr\` aborts with:
+
+\`\`\`text
+Invalid JSON in "tests/sum.test.json": ...
+\`\`\`
+
+fix the JSON syntax. You can validate it with:
+
+\`\`\`bash
+node -e "JSON.parse(require('fs').readFileSync('tests/sum.test.json','utf8'))"
+\`\`\`
+
+## Unknown option warning
+
+\`\`\`text
+[sstr] Warning: Unknown option "timer" in "options" of "tests/sum.test.json".
+\`\`\`
+
+The warning does not stop the run. Check the spelling against the list in
+[Writing Tests](writing-tests.md#options).

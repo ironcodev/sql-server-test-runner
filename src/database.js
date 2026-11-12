@@ -1,7 +1,6 @@
 import { runSqlcmd, buildConnectionArgs } from "./sqlcmd.js";
 import { join } from "path";
 import { mkdir } from "fs/promises";
-import { platform } from "os";
 
 /**
  * Builds a path for SQL Server file redirection (RESTORE ... MOVE).
@@ -13,23 +12,15 @@ import { platform } from "os";
  * in a N'...' literal inside a RESTORE statement.
  */
 function buildSqlServerPath(dir, fileName) {
-  const sep = platform() === "win32" ? "\\" : "/";
-  // Normalize whatever separator the caller used, then join with the
-  // platform-specific separator.
+  const sep = process.platform === "win32" ? "\\" : "/";
   const normalizedDir = String(dir).replace(/[\\/]+$/, "");
   const full = `${normalizedDir}${sep}${fileName}`;
   return full.replace(/'/g, "''");
 }
 
-// queryScalar
-async function queryScalar(
-  cfg,
-  query,
-  database = "master",
-  { debug = false } = {},
-) {
+async function queryScalar(cfg, query, database = "master", { debug = false } = {}) {
   const args = buildConnectionArgs(cfg, { database });
-  args.push("-h", "-1", "-W", "-Q", query); // ✅ ترتیب درست
+  args.push("-h", "-1", "-W", "-Q", query);
   const res = await runSqlcmd(args, { debug });
   if (res.code !== 0) {
     throw new Error(`Query failed: ${res.stderr || res.stdout}`);
@@ -37,15 +28,9 @@ async function queryScalar(
   return res.stdout.trim();
 }
 
-// queryRows
-async function queryRows(
-  cfg,
-  query,
-  database = "master",
-  { debug = false } = {},
-) {
+async function queryRows(cfg, query, database = "master", { debug = false } = {}) {
   const args = buildConnectionArgs(cfg, { database });
-  args.push("-h", "-1", "-W", "-s", "|", "-Q", query); // ✅ ترتیب درست
+  args.push("-h", "-1", "-W", "-s", "|", "-Q", query);
   const res = await runSqlcmd(args, { debug });
   if (res.code !== 0) {
     throw new Error(`Query failed: ${res.stderr || res.stdout}`);
@@ -62,9 +47,7 @@ export async function checkConnection(cfg, { debug = false } = {}) {
   args.push("-Q", "select 1");
   const res = await runSqlcmd(args, { debug });
   if (res.code !== 0) {
-    throw new Error(
-      `Failed to connect to the server:\n${(res.stderr || res.stdout || "").trim()}`,
-    );
+    throw new Error(`Failed to connect to the server:\n${(res.stderr || res.stdout || "").trim()}`);
   }
 }
 
@@ -98,11 +81,12 @@ async function resolveBackupDir(cfg, { debug = false } = {}) {
     try {
       await mkdir(dir, { recursive: true });
     } catch {
-      // ignore
+      // ignore; the server-side error will be more informative.
     }
     return dir;
   }
 
+  // Ask SQL Server for its default paths.
   const args = buildConnectionArgs(cfg, { database: "master" });
   args.push(
     "-Q",
@@ -118,9 +102,7 @@ async function resolveBackupDir(cfg, { debug = false } = {}) {
   );
   const res = await runSqlcmd(args, { debug });
   if (res.code !== 0) {
-    throw new Error(
-      `Failed to query SQL Server default paths: ${res.stderr || res.stdout}`,
-    );
+    throw new Error(`Failed to query SQL Server default paths: ${res.stderr || res.stdout}`);
   }
   const line = res.stdout.trim().split(/\r?\n/)[0] || "";
   const [backupPath, dataPath, logPath] = line.split("|").map((s) => s.trim());
@@ -136,27 +118,24 @@ async function resolveBackupDir(cfg, { debug = false } = {}) {
   return dir;
 }
 
-export async function backupAndRestore(
-  cfg,
-  sourceDb,
-  targetDb,
-  { debug = false } = {},
-) {
+/**
+ * Backs up sourceDb to a .bak file, then restores it under targetDb.
+ * Filegroups and their files are preserved.
+ */
+export async function backupAndRestore(cfg, sourceDb, targetDb, { debug = false } = {}) {
   const safeSource = sourceDb.replace(/[\]\[]/g, "");
   const safeTarget = targetDb.replace(/[\]\[]/g, "");
   const safeSourceStr = safeSource.replace(/'/g, "''");
 
   const backupDir = await resolveBackupDir(cfg, { debug });
   const stamp = `${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
-  const backupFile = join(backupDir, `sstr_${safeSource}_${stamp}.bak`);
-  const backupFileSql = buildSqlServerPath(
-    backupDir,
-    `sstr_${safeSource}_${stamp}.bak`,
-  );
+  const backupName = `sstr_${safeSource}_${stamp}.bak`;
+  const backupPathOnClient = join(backupDir, backupName);
+  const backupFileSql = buildSqlServerPath(backupDir, backupName);
 
   const backupQ = `backup database [${safeSource}] to disk = N'${backupFileSql}' with init, copy_only`;
   await queryScalar(cfg, backupQ, "master", { debug });
-
+  
   const files = await queryRows(
     cfg,
     `set nocount on;
@@ -182,17 +161,18 @@ export async function backupAndRestore(
     moves.push(`move N'${safeLogical}' to N'${newPath}'`);
   }
 
-  const restoreQ = `restore database [${safeTarget}] from disk = N'${backupFileSql}' with replace, ${moves.join(",\n")}`;
+  const restoreQ = `restore database [${safeTarget}] from disk = N'${backupFileSql}' with replace, ${moves.join(
+    ",\n",
+  )}`;
   await queryScalar(cfg, restoreQ, "master", { debug });
 
-  return backupFile;
+  return backupPathOnClient;
 }
 
-export async function listStoredProcedures(
-  cfg,
-  dbName,
-  { debug = false } = {},
-) {
+/**
+ * Lists stored procedures in the given database, formatted as "schema.name".
+ */
+export async function listStoredProcedures(cfg, dbName, { debug = false } = {}) {
   const q = `
     set nocount on;
     select s.name + '.' + p.name
@@ -206,11 +186,23 @@ export async function listStoredProcedures(
     .filter(Boolean);
 }
 
+/**
+ * Executes a test procedure.
+ *
+ * Parameters (if any) are passed as NULL.
+ *
+ * When `useTransaction` is true (default), the call is wrapped in a
+ * transaction that is rolled back at the end, isolating the test from its
+ * peers. If the procedure commits internally, the rollback is skipped.
+ *
+ * When `queryTimeout` is provided, it overrides the global `queryTimeout`
+ * for this single call (passed to sqlcmd as `-t`).
+ */
 export async function executeTestProcedure(
   cfg,
   dbName,
   fullName,
-  { debug = false, useTransaction = true } = {},
+  { debug = false, useTransaction = true, queryTimeout = null } = {},
 ) {
   const [schema, name] = fullName.split(".");
   if (!schema || !name) {
@@ -276,6 +268,17 @@ export async function executeTestProcedure(
   }
 
   const args = buildConnectionArgs(cfg, { database: dbName });
+
+  // Override the query timeout for this call if requested.
+  if (queryTimeout != null) {
+    const idx = args.indexOf("-t");
+    if (idx !== -1 && idx + 1 < args.length) {
+      args[idx + 1] = String(queryTimeout);
+    } else {
+      args.push("-t", String(queryTimeout));
+    }
+  }
+
   args.push("-Q", execSql);
   return runSqlcmd(args, { debug });
 }

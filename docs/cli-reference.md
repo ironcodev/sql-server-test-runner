@@ -187,7 +187,7 @@ Overrides `queryTimeout` from the config. Non-negative integer; passed to `sqlcm
 
 ### `-nt`, `--no-transaction`
 
-Disables the per-test transaction wrapper. Accepted by `run` only.
+\`--no-transaction\` overrides the per-test \`transaction\` option for every test, including those set in per-file JSON files. Accepted by `run` only.
 
 By default, each test procedure is executed inside a `BEGIN TRANSACTION` … `ROLLBACK` block, so any data changes it makes are discarded when the procedure finishes, and tests cannot leak state into each other. Use this flag only when a test procedure (or a procedure under test) issues its own `COMMIT`; in that case the wrapper cannot roll the changes back and the test would otherwise fail with a misleading error about a missing transaction.
 

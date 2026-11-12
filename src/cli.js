@@ -7,12 +7,7 @@ import { createInterface } from "readline/promises";
 import { loadConfig, validateConfig, mergeCliOverrides } from "./config.js";
 import { run } from "./runner.js";
 import { discoverTestFiles } from "./discover.js";
-import {
-  checkConnection,
-  databaseExists,
-  dropDatabase,
-  listSstDatabases,
-} from "./database.js";
+import { checkConnection, databaseExists, dropDatabase, listSstDatabases } from "./database.js";
 import { runSqlcmd, buildConnectionArgs } from "./sqlcmd.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -28,9 +23,7 @@ function getName(version) {
 
 function printBanner(version) {
   console.log(getName(version));
-  console.log(
-    "  SQL script test runner for unit testing SQL Server databases, powered by sqlcmd.",
-  );
+  console.log("  SQL script test runner for unit testing SQL Server databases, powered by sqlcmd.");
   console.log("");
   console.log('Run "sstr run" to execute tests, or "sstr --help" for usage.');
 }
@@ -95,9 +88,9 @@ Execution control (run only):
   -b, --bail                    Stop at the first failing test.
   -kd, --keep-db                Do not drop the test database at the end.
   -nt, --no-transaction         Do not wrap each test procedure in a
-                                transaction. Use this only for test procedures
-                                that COMMIT internally; otherwise data changes
-                                from one test can leak into the next.
+                                transaction. Overrides the per-test "transaction"
+                                option for every test.
+
 Clean options (clean only):
   --dry-run                     Show what would be removed, change nothing.
   --keep-backups                Only drop databases; do not delete .bak files.
@@ -153,9 +146,7 @@ async function fileExists(path) {
 
 async function confirm(question) {
   if (!process.stdin.isTTY) {
-    throw new Error(
-      'Refusing to prompt without a TTY. Use "--yes" to proceed non-interactively.',
-    );
+    throw new Error('Refusing to prompt without a TTY. Use "--yes" to proceed non-interactively.');
   }
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
@@ -171,12 +162,7 @@ async function confirm(question) {
 // ============================================================
 
 async function prepareContext(opts) {
-  const colorEnabled =
-    opts.color === true
-      ? true
-      : opts.color === false
-        ? false
-        : Boolean(process.stdout.isTTY);
+  const colorEnabled = opts.color === true ? true : opts.color === false ? false : Boolean(process.stdout.isTTY);
 
   let cfg = await loadConfig(opts.cwd, opts.env, {
     configPath: opts.configPath,
@@ -227,9 +213,7 @@ const DEFAULT_CONFIG_JSON = `{
 export async function cmdInit(opts) {
   const target = join(opts.cwd, "sstr.config.json");
   if (await fileExists(target)) {
-    throw new Error(
-      `"sstr.config.json" already exists in "${opts.cwd}". Aborting.`,
-    );
+    throw new Error(`"sstr.config.json" already exists in "${opts.cwd}". Aborting.`);
   }
   await writeFile(target, DEFAULT_CONFIG_JSON, "utf-8");
   console.log(`Created "${target}".`);
@@ -237,18 +221,17 @@ export async function cmdInit(opts) {
 
 export async function cmdConnect(opts) {
   if (opts.reportType !== "console") {
-    throw new Error(
-      `"connect" only supports --report-type console (got "${opts.reportType}").`,
-    );
+    throw new Error(`"connect" only supports --report-type console (got "${opts.reportType}").`);
   }
   if (opts.bail) throw new Error('"--bail" is only supported by "sstr run".');
-  if (opts.keepDb)
-    throw new Error('"--keep-db" is only supported by "sstr run".');
+  if (opts.keepDb) throw new Error('"--keep-db" is only supported by "sstr run".');
 
   const { cfg } = await prepareContext(opts);
 
   const server = cfg.connection?.server || "(unknown)";
-  console.log(`Connecting to "${server}" (master)...`);
+  if (opts.detailed) {
+    console.log(`Connecting to "${server}" (master)...`);
+  }
   const t0 = Date.now();
   await checkConnection(cfg, { debug: opts.detailed });
   const elapsed = Date.now() - t0;
@@ -257,15 +240,7 @@ export async function cmdConnect(opts) {
   let defaultDb = null;
   try {
     const args = buildConnectionArgs(cfg, { database: "master" });
-    args.push(
-      "-Q",
-      "set nocount on; select @@version as v, db_name() as d;",
-      "-h",
-      "-1",
-      "-W",
-      "-s",
-      "|",
-    );
+    args.push("-h", "-1", "-W", "-s", "|", "-Q", "set nocount on; select @@version as v, db_name() as d;");
     const res = await runSqlcmd(args, { debug: opts.detailed });
     if (res.code === 0) {
       const line = res.stdout.trim().split(/\r?\n/)[0] || "";
@@ -277,10 +252,13 @@ export async function cmdConnect(opts) {
     // ignore; connection already succeeded.
   }
 
-  if (serverVersion) console.log(`  server:        ${serverVersion}`);
-  if (defaultDb) console.log(`  default db:    ${defaultDb}`);
-  console.log(`  connected in:  ${elapsed} ms`);
-  console.log("OK");
+  if (opts.detailed) {
+    if (serverVersion) console.log(`  server    : ${serverVersion}`);
+    if (defaultDb)     console.log(`  default db: ${defaultDb}`);
+    console.log(`  connected in:  ${elapsed} ms`);
+  }
+  
+  console.log("Connection is OK.");
 }
 
 export async function cmdConfig(opts) {
@@ -300,22 +278,18 @@ export async function cmdList(opts) {
 
 export async function cmdClean(opts) {
   if (opts.reportType !== "console") {
-    throw new Error(
-      `"clean" only supports --report-type console (got "${opts.reportType}").`,
-    );
+    throw new Error(`"clean" only supports --report-type console (got "${opts.reportType}").`);
   }
   if (opts.bail) throw new Error('"--bail" is only supported by "sstr run".');
-  if (opts.keepDb)
-    throw new Error('"--keep-db" is only supported by "sstr run".');
+  if (opts.keepDb) throw new Error('"--keep-db" is only supported by "sstr run".');
 
   const { cfg } = await prepareContext(opts);
 
-  const testDb = cfg.testDb || "sstr_testdb";
+  const testDb = cfg.testDb || "sst_testdb";
   const backupPath = cfg.backupPath || null;
 
   console.log("Cleaning up test artifacts...");
 
-  // ---- Discover target databases ----
   const dbTargets = new Set();
 
   if (await databaseExists(cfg, testDb, { debug: opts.detailed })) {
@@ -326,17 +300,14 @@ export async function cmdClean(opts) {
   });
   for (const d of restored) dbTargets.add(d);
 
-  // ---- Discover backup files ----
   let backupFiles = [];
   if (backupPath && !opts.keepBackups) {
     try {
       const entries = await readdir(backupPath, { withFileTypes: true });
       for (const e of entries) {
-        if (
-          e.isFile() &&
-          e.name.startsWith("sstr_") &&
-          e.name.toLowerCase().endsWith(".bak")
-        ) {
+        const isSstrBackup = e.isFile() && e.name.startsWith("sstr_") && e.name.toLowerCase().endsWith(".bak");
+
+        if (isSstrBackup) {
           backupFiles.push(join(backupPath, e.name));
         }
       }
@@ -345,7 +316,6 @@ export async function cmdClean(opts) {
     }
   }
 
-  // ---- Report what was found ----
   if (dbTargets.size === 0 && backupFiles.length === 0) {
     console.log("Nothing to clean.");
     return;
@@ -367,7 +337,6 @@ export async function cmdClean(opts) {
     console.log("  Found backup files: (none)");
   }
 
-  // ---- Dry run ----
   if (opts.dryRun) {
     console.log("");
     console.log("[dry-run] No changes were made.");
@@ -380,19 +349,15 @@ export async function cmdClean(opts) {
     return;
   }
 
-  // ---- Confirm ----
   if (!opts.yes) {
     console.log("");
-    const ok = await confirm(
-      "Proceed with cleanup? This cannot be undone. [y/N] ",
-    );
+    const ok = await confirm("Proceed with cleanup? This cannot be undone. [y/N] ");
     if (!ok) {
       console.log("Aborted.");
       return;
     }
   }
 
-  // ---- Drop databases ----
   let droppedCount = 0;
   for (const d of [...dbTargets].sort()) {
     try {
@@ -404,7 +369,6 @@ export async function cmdClean(opts) {
     }
   }
 
-  // ---- Delete backup files ----
   let deletedCount = 0;
   for (const f of backupFiles) {
     try {
@@ -417,9 +381,7 @@ export async function cmdClean(opts) {
   }
 
   console.log("");
-  console.log(
-    `Done. Dropped ${droppedCount} database(s), removed ${deletedCount} file(s).`,
-  );
+  console.log(`Done. Dropped ${droppedCount} database(s), removed ${deletedCount} file(s).`);
 }
 
 export async function cmdRun(opts) {
@@ -455,12 +417,11 @@ function parseCliArgs(argv) {
     testRegex: null,
     color: null,
     reportType: "console",
-    useTransaction: true,
     bail: false,
     keepDb: false,
     queryTimeout: null,
     detailed: false,
-    // clean-specific
+    useTransaction: true,
     dryRun: false,
     keepBackups: false,
     yes: false,
@@ -472,9 +433,7 @@ function parseCliArgs(argv) {
   if (args[0] && !args[0].startsWith("-")) {
     opts.command = args.shift();
     if (!ALLOWED_COMMANDS.includes(opts.command)) {
-      throw new Error(
-        `Unknown command: ${opts.command}. Allowed: ${ALLOWED_COMMANDS.join(", ")}.`,
-      );
+      throw new Error(`Unknown command: ${opts.command}. Allowed: ${ALLOWED_COMMANDS.join(", ")}.`);
     }
   }
 
@@ -525,15 +484,9 @@ function parseCliArgs(argv) {
       const v = args.shift();
       if (!v) throw new Error("Missing value for --report-type.");
       if (!["console", "json", "junit"].includes(v)) {
-        throw new Error(
-          `Invalid --report-type "${v}". Allowed: console, json, junit.`,
-        );
+        throw new Error(`Invalid --report-type "${v}". Allowed: console, json, junit.`);
       }
       opts.reportType = v;
-      continue;
-    }
-    if (a === "-nt" || a === "--no-transaction") {
-      opts.useTransaction = false;
       continue;
     }
     if (a === "-b" || a === "--bail") {
@@ -548,13 +501,16 @@ function parseCliArgs(argv) {
       const v = args.shift();
       if (!v) throw new Error("Missing value for --query-timeout.");
       const n = Number(v);
-      if (!Number.isFinite(n) || n < 0)
-        throw new Error("--query-timeout must be a non-negative number.");
+      if (!Number.isFinite(n) || n < 0) throw new Error("--query-timeout must be a non-negative number.");
       opts.queryTimeout = n;
       continue;
     }
     if (a === "-dr" || a === "--detailed-report") {
       opts.detailed = true;
+      continue;
+    }
+    if (a === "-nt" || a === "--no-transaction") {
+      opts.useTransaction = false;
       continue;
     }
     if (a === "--dry-run") {
@@ -584,13 +540,11 @@ export async function runCLI(argv) {
   const opts = parseCliArgs(argv);
   const version = await readPackageVersion();
 
-  // No arguments → banner.
   if (!opts.hadAnyArg) {
     printBanner(version);
     return;
   }
 
-  // Immediate-exit flags.
   if (opts.help) {
     console.log(buildHelp(version));
     return;
@@ -600,11 +554,8 @@ export async function runCLI(argv) {
     return;
   }
 
-  // Commands must be explicit. "run" is required to execute tests.
   if (opts.command == null) {
-    const flags = argv
-      .filter((a) => !a.startsWith("-") || a.startsWith("--"))
-      .join(" ");
+    const flags = argv.filter((a) => !a.startsWith("-") || a.startsWith("--")).join(" ");
     const hint = flags ? `sstr run ${flags}` : "sstr run";
     throw new Error(
       `Missing command. Allowed commands: ${ALLOWED_COMMANDS.join(", ")}. ` +

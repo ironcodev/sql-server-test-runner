@@ -89,6 +89,78 @@ By default, `sstr` uses `sst_testdb`. If you set `testDb` in the config:
 
 If you want tests to run against a schema that already exists (your real schema), point `testDb` at a database that already has it. `sstr` will back it up and restore a copy, so your original stays safe.
 
+## Per-test options
+
+Put a JSON file next to each test file to customize how `sstr` runs its tests:
+
+\`\`\`text
+tests/
+├── sum.test.sql
+├── sum.test.json
+└── users.test.sql
+\`\`\`
+
+\`sum.test.json\`:
+
+\`\`\`json
+{
+  "options": {
+    "transaction": false,
+    "logExecution": true
+  },
+  "tests": {
+    "test_sum_should_return_sum_of_values": {
+      "transaction": true
+    },
+    "test_sum_should_return_zero_for_null_values": {
+      "skip": true
+    }
+  }
+}
+\`\`\`
+
+The JSON file name is the test file name with `.sql` replaced by `.json`.
+
+### Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| \`transaction\` | boolean | \`true\` | Wrap the test in a transaction and roll it back. Set to \`false\` for tests that commit internally. |
+| \`logExecution\` | boolean | \`false\` | Measure and report the execution time of this test. |
+| \`skip\` | boolean | \`false\` | Skip this test. It is reported as skipped. |
+| \`timeout\` | number | \`null\` | Query timeout in seconds for this test. Overrides \`queryTimeout\` from the config. |
+| \`preScript\` | string | \`null\` | Path to a \`.sql\` file that runs before this test. |
+| \`postScript\` | string | \`null\` | Path to a \`.sql\` file that runs after this test. |
+| \`throws\` | boolean or number | \`false\` | If \`true\`, the test must fail with any error. If a number, the test must fail with that SQL Server error number. |
+
+### Resolution order
+
+Priority (low to high):
+
+1. \`sstr\` defaults.
+2. \`defaultTestOptions\` in \`sstr.config.json\`.
+3. \`options\` in the JSON file (applies to all tests in the file).
+4. \`tests.<procedureName>\` in the JSON file (applies to one test).
+5. CLI switches (e.g. \`--no-transaction\` overrides \`transaction\` for all tests).
+
+Test names in \`tests\` are matched against the **bare procedure name** (without schema), case-insensitively.
+
+### Errors and warnings
+
+- If the JSON file exists but is invalid, \`sstr\` aborts with:
+  \`\`\`text
+  Invalid JSON in "tests/sum.test.json": Unexpected token } at position 42
+  \`\`\`
+- If the JSON file contains an unknown key, \`sstr\` prints a warning and continues:
+  \`\`\`text
+  [sstr] Warning: Unknown option "timer" in "options" of "tests/sum.test.json". Allowed: transaction, logExecution, skip, timeout, preScript, postScript, throws.
+  \`\`\`
+- If the JSON file does not exist, defaults are used.
+
+### \`$(TestSuite)\`
+
+\`sstr\` still passes \`$(TestSuite)\` (the test file path) to \`sqlcmd\`, so you can use it inside test scripts if needed.
+
 ## Multiple assertions per test
 
 If one assertion fails, the procedure raises an error and the test is marked failed. Subsequent assertions in the same procedure are not executed. If you want to collect multiple failures, write multiple test procedures.
@@ -101,9 +173,11 @@ create or alter proc test_sum_should_return_zero_for_null_values
 as
 begin
     set nocount on;
+
     declare @a int;
-    declare @b int;
-    declare @result int = dbo.Sum(@a, @b);
+    
+    declare @result int = dbo.Sum(@a, null);
+
     exec Assert.Equals @result, 0;
 end
 go
@@ -112,9 +186,12 @@ create or alter proc test_sum_should_return_sum_of_values
 as
 begin
     set nocount on;
+
     declare @a int = 10;
     declare @b int = 20;
+
     declare @result int = dbo.Sum(@a, @b);
+
     exec Assert.Equals @result, 30;
 end
 go
@@ -149,9 +226,9 @@ begin
     set nocount on;
 
     exec Assert.TableExists      'dbo.Users';
-    exec Assert.ColumnExists     'dbo.Users', 'email';
-    exec Assert.ForeignKeyExists 'dbo.Orders', 'FK_Orders_Users';
-    exec Assert.DefaultExists    'dbo.Users', 'createdAt';
+    exec Assert.ColumnExists     'dbo.Users.email';
+    exec Assert.ForeignKeyExists 'dbo.Orders.UserId', 'Users.Id';
+    exec Assert.DefaultExists    'dbo.Users.createdAt', 'getdate()';
 end
 go
 ```
