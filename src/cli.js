@@ -23,7 +23,7 @@ function getName(version) {
 
 function printBanner(version) {
   console.log(getName(version));
-  console.log("  SQL script test runner for unit testing SQL Server databases, powered by sqlcmd.");
+  console.log("  A test runner for unit testing SQL Server databases, powered by sqlcmd.");
   console.log("");
   console.log('Run "sstr run" to execute tests, or "sstr --help" for usage.');
 }
@@ -55,6 +55,11 @@ Commands:
   clean                         Remove leftover test databases and .bak files
                                 from previous runs. Supports --dry-run,
                                 --keep-backups, and --yes.
+  options                       Print a sample per-test options JSON file
+                                (for redirect: sstr options > tests/x.json).
+  help [topic]                  Print help. With no topic, print the general
+                                help. Use "sstr help options" for the
+                                per-test options reference.
 
 General options:
   -v, --version                 Print the program version and exit.
@@ -112,6 +117,8 @@ Examples:
   sstr run --report-type junit --no-color --bail > report.xml
   sstr run --config ./configs/sstr.ci.json --env ci --query-timeout 120
   sstr run --detailed-report --keep-db --no-color 2> sstr.trace.log
+  sstr options > tests/my_test.json
+  sstr help options
 
 Exit codes:
   0   Connection succeeded / all tests passed / nothing to clean.
@@ -180,6 +187,116 @@ async function prepareContext(opts) {
 // Commands
 // ============================================================
 
+const SAMPLE_OPTIONS_JSON = `{
+  "options": {
+    "transaction": true,
+    "logExecution": false,
+    "skip": false,
+    "timeout": null,
+    "preScript": null,
+    "postScript": null,
+    "throws": false
+  },
+  "tests": {
+    "example_test_name": {
+      "transaction": true,
+      "logExecution": true,
+      "skip": false,
+      "timeout": 30,
+      "preScript": "tests/pre_test.sql",
+      "postScript": "tests/post_test.sql",
+      "throws": false
+    }
+  }
+}`;
+
+export async function cmdOptions(opts) {
+  process.stdout.write(SAMPLE_OPTIONS_JSON + "\n");
+}
+
+const OPTIONS_HELP = `
+Per-test options
+
+Put a JSON file next to each test file to customize how sstr runs its tests.
+The JSON file name is the test file name with ".sql" replaced by ".json"
+(e.g. "sum.test.sql" -> "sum.test.json").
+
+To bootstrap the file:
+
+  sstr options > tests/sum.test.json
+
+Structure:
+
+  {
+    "options": { ... },             # applies to all tests in the file
+    "tests": {
+      "<procedure_name>": { ... }   # applies to one test (bare name, no schema)
+    }
+  }
+
+Available options:
+
+  transaction   boolean   Wrap the test in a transaction and roll it back
+                          (default: true). Set to false for tests that commit
+                          internally.
+
+  logExecution  boolean   Measure and report the execution time of this test
+                          (default: false).
+
+  skip          boolean   Skip this test; it is reported as skipped
+                          (default: false).
+
+  timeout       number    Query timeout in seconds for this test
+                          (default: null, which uses the global queryTimeout).
+
+  preScript     string    Path to a .sql file that runs before this test
+                          (relative to --cwd). Default: null.
+
+  postScript    string    Path to a .sql file that runs after this test
+                          (relative to --cwd). Default: null.
+
+  throws        boolean   If true, the test must fail with any error.
+                | number  If a number, the test must fail with that SQL Server
+                          error number (default: false).
+
+Priority (low to high):
+
+  1. sstr defaults
+  2. defaultTestOptions in sstr.config.json
+  3. "options" in the JSON file (applies to all tests in the file)
+  4. "tests.<procedureName>" in the JSON file (applies to one test)
+  5. CLI switches (e.g. --no-transaction overrides transaction for all tests)
+
+See also:
+  sstr options           Print a sample JSON file (for redirect)
+  sstr help              Print the general help
+`;
+
+const GENERAL_HELP_TOPICS = `
+Available help topics:
+
+  options     Per-test options (JSON file next to each test file)
+
+Usage:
+  sstr help              General help
+  sstr help options      Per-test options reference
+`;
+
+export async function cmdHelp(opts) {
+  const topic = opts.helpTopic || null;
+
+  if (topic === "options") {
+    process.stdout.write(OPTIONS_HELP);
+    return;
+  }
+  if (topic == null) {
+    console.log(buildHelp(await readPackageVersion()));
+    return;
+  }
+
+  throw new Error(`Unknown help topic: ${topic}. ${GENERAL_HELP_TOPICS.trim()}`);
+}
+
 const DEFAULT_CONFIG_JSON = `{
   "connection": {
     "server": "localhost",
@@ -198,6 +315,7 @@ const DEFAULT_CONFIG_JSON = `{
   "testMatch": "^test_",
   "testSchema": "sstr",
   "assertSchema": "Assert",
+  "defaultTestOptions": {},
   "scripts": {
     "warmUp": "",
     "coolDown": "",
@@ -254,10 +372,10 @@ export async function cmdConnect(opts) {
 
   if (opts.detailed) {
     if (serverVersion) console.log(`  server    : ${serverVersion}`);
-    if (defaultDb)     console.log(`  default db: ${defaultDb}`);
+    if (defaultDb) console.log(`  default db: ${defaultDb}`);
     console.log(`  connected in:  ${elapsed} ms`);
   }
-  
+
   console.log("Connection is OK.");
 }
 
@@ -406,7 +524,7 @@ export async function cmdRun(opts) {
 // Argument parsing
 // ============================================================
 
-const ALLOWED_COMMANDS = ["init", "run", "list", "config", "connect", "clean"];
+const ALLOWED_COMMANDS = ["init", "run", "list", "config", "connect", "clean", "options", "help"];
 
 function parseCliArgs(argv) {
   const opts = {
@@ -434,6 +552,10 @@ function parseCliArgs(argv) {
     opts.command = args.shift();
     if (!ALLOWED_COMMANDS.includes(opts.command)) {
       throw new Error(`Unknown command: ${opts.command}. Allowed: ${ALLOWED_COMMANDS.join(", ")}.`);
+    }
+    // "help" takes an optional topic argument.
+    if (opts.command === "help" && args[0] && !args[0].startsWith("-")) {
+      opts.helpTopic = args.shift();
     }
   }
 
@@ -576,6 +698,10 @@ export async function runCLI(argv) {
       return cmdClean(opts);
     case "run":
       return cmdRun(opts);
+    case "options":
+      return cmdOptions(opts);
+    case "help":
+      return cmdHelp(opts);
     default:
       throw new Error(`Unknown command: ${opts.command}`);
   }

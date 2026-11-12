@@ -171,6 +171,10 @@ export async function run(
     },
   };
 
+  const initLogger = reportType === "console" ? (msg) => logger.log(msg) : (msg) => console.error(msg);
+
+  initLogger("Initializing ...");
+
   progressLogger.log("Checking connection to the server...");
   await checkConnection(cfg, { debug });
   progressLogger.log("Connection established.");

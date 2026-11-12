@@ -117,6 +117,28 @@ sstr clean --yes --keep-backups
 
 In non-TTY environments, `sstr clean` aborts unless `--yes` is given.
 
+### `sstr options`
+
+Prints a sample per-test options JSON file. Redirect it next to a test file,
+then edit as needed.
+
+```bash
+sstr options > tests/my_test.json
+```
+
+The sample contains all supported options. See
+[Writing Tests](https://github.com/ironcodev/sql-server-test-runner/blob/main/docs/writing-tests.md) for the full reference,
+or run `sstr help options`.
+
+### `sstr help options`
+Prints help. With no topic, prints the general help. With a topic, prints
+that topic's reference.
+
+```bash
+sstr help
+sstr help options
+```
+
 ## General options
 
 ### `-v`, `--version`

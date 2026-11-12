@@ -121,6 +121,19 @@ tests/
 
 The JSON file name is the test file name with `.sql` replaced by `.json`.
 
+To bootstrap the JSON file, run `sstr options` and copy the output next to
+your test file:
+```bash
+sstr options > tests/my_test.json
+```
+
+Then, modify options based on your needs.
+
+For a full reference at the terminal:
+```bash
+sstr help options
+```
+
 ### Options
 
 | Option | Type | Default | Description |
