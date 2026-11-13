@@ -156,6 +156,9 @@ create or alter proc $(AssertSchema).IsTrue (@a sql_variant)
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
+
     if @a is null
         raiserror('IsTrue failed: value is null', 16, 1);
     else if try_cast(@a as bit) is null
@@ -169,6 +172,9 @@ create or alter proc $(AssertSchema).IsFalse (@a sql_variant)
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
+
     if @a is null
         raiserror('IsFalse failed: value is null', 16, 1);
     else if try_cast(@a as bit) is null
@@ -182,6 +188,9 @@ create or alter proc $(AssertSchema).IsNull (@a sql_variant)
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
+
     if @a is not null
         raiserror('IsNull failed: value is not null', 16, 1);
 end
@@ -191,6 +200,9 @@ create or alter proc $(AssertSchema).IsNotNull (@a sql_variant)
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
+
     if @a is null
         raiserror('IsNotNull failed: value is null', 16, 1);
 end
@@ -200,6 +212,9 @@ create or alter proc $(AssertSchema).IsNumeric (@a sql_variant)
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
+
     if @a is null
         raiserror('IsNumeric failed: value is null', 16, 1);
     else if try_cast(@a as float) is null
@@ -211,6 +226,9 @@ create or alter proc $(AssertSchema).IsEmpty (@a sql_variant)
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
+
     if @a is null
         raiserror('IsEmpty failed: value is null', 16, 1);
     else if cast(@a as nvarchar(max)) <> ''
@@ -226,6 +244,8 @@ create or alter proc $(AssertSchema).Equals (@a sql_variant, @b sql_variant)
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
 
     -- Both NULL → equal.
     if @a is null and @b is null return;
@@ -244,6 +264,8 @@ as
 begin
     set nocount on;
 
+    print 'SSTR_ASSERTION';
+
     if @a is null and @b is null
         raiserror('NotEquals failed: both values are null', 16, 1);
 
@@ -257,6 +279,9 @@ create or alter proc $(AssertSchema).IsGT (@a sql_variant, @b sql_variant)
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
+
     if @a is null or @b is null
         raiserror('IsGT failed: one of the values is null', 16, 1);
     if try_cast(@a as float) is null or try_cast(@b as float) is null
@@ -270,6 +295,9 @@ create or alter proc $(AssertSchema).IsGTE (@a sql_variant, @b sql_variant)
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
+
     if @a is null or @b is null
         raiserror('IsGTE failed: one of the values is null', 16, 1);
     if try_cast(@a as float) is null or try_cast(@b as float) is null
@@ -283,6 +311,9 @@ create or alter proc $(AssertSchema).IsLT (@a sql_variant, @b sql_variant)
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
+
     if @a is null or @b is null
         raiserror('IsLT failed: one of the values is null', 16, 1);
     if try_cast(@a as float) is null or try_cast(@b as float) is null
@@ -296,6 +327,9 @@ create or alter proc $(AssertSchema).IsLTE (@a sql_variant, @b sql_variant)
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
+
     if @a is null or @b is null
         raiserror('IsLTE failed: one of the values is null', 16, 1);
     if try_cast(@a as float) is null or try_cast(@b as float) is null
@@ -309,6 +343,9 @@ create or alter proc $(AssertSchema).IsBetween (@a sql_variant, @from sql_varian
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
+
     if @a is null or @from is null or @to is null
         raiserror('IsBetween failed: one of the values is null', 16, 1);
     if try_cast(@a as float) is null
@@ -324,6 +361,9 @@ create or alter proc $(AssertSchema).NotBetween (@a sql_variant, @from sql_varia
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
+
     if @a is null or @from is null or @to is null
         raiserror('NotBetween failed: one of the values is null', 16, 1);
     if try_cast(@a as float) is null
@@ -343,6 +383,9 @@ create or alter proc $(AssertSchema).TableExists (@table sysname)
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
+
     if object_id(@table, 'U') is null
         raiserror('TableExists failed: table does not exist', 16, 1);
 end
@@ -352,6 +395,9 @@ create or alter proc $(AssertSchema).TableNotExists (@table sysname)
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
+
     if object_id(@table, 'U') is not null
         raiserror('TableNotExists failed: table exists', 16, 1);
 end
@@ -361,6 +407,8 @@ create or alter proc $(AssertSchema).ColumnExists (@table_column sysname)
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
 
     declare @schema sysname, @table sysname, @column sysname;
 
@@ -389,6 +437,8 @@ create or alter proc $(AssertSchema).ColumnNotExists (@table_column sysname)
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
 
     declare @schema sysname, @table sysname, @column sysname;
 
@@ -420,6 +470,8 @@ create or alter proc $(AssertSchema).ForeignKeyExists (
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
 
     -- Parse the FK side: (schema, table, column, ord).
     declare @fk_schema sysname, @fk_table sysname;
@@ -499,6 +551,8 @@ as
 begin
     set nocount on;
 
+    print 'SSTR_ASSERTION';
+
     declare @fk_schema sysname, @fk_table sysname;
     declare @fk_cols table (ord int primary key, column_name sysname);
 
@@ -572,6 +626,8 @@ as
 begin
     set nocount on;
 
+    print 'SSTR_ASSERTION';
+
     declare @schema sysname, @table sysname, @column sysname;
 
     select @schema = p.schema_name,
@@ -617,6 +673,8 @@ create or alter proc $(AssertSchema).DefaultNotExists (
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
 
     declare @schema sysname, @table sysname, @column sysname;
 
@@ -670,6 +728,8 @@ as
 begin
     set nocount on;
 
+    print 'SSTR_ASSERTION';
+
     if object_id(@table, 'U') is null
     begin
         raiserror('RecordExists failed: table does not exist', 16, 1);
@@ -721,6 +781,8 @@ create or alter proc $(AssertSchema).RecordNotExists (@table sysname, @json nvar
 as
 begin
     set nocount on;
+
+    print 'SSTR_ASSERTION';
 
     if object_id(@table, 'U') is null
     begin

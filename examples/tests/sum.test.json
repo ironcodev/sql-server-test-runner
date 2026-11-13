@@ -1,0 +1,18 @@
+{
+  "options": {
+    "transaction": true,
+    "logExecution": false,
+    "skip": false
+  },
+  "tests": {
+    "sum_with_null_args_should_return_null": {
+      "skip": true
+    },
+    "sum_of_mixed_numeric_values_should_return_summation_of_them": {
+      "transaction": false
+    },
+    "sum_of_numeric_strings_should_return_summation_of_them": {
+      "logExecution": true
+    }
+  }
+}

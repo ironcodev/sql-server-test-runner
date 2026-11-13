@@ -11,8 +11,8 @@ import { mkdir } from "fs/promises";
  * The result is SQL-escaped (single quotes doubled) and ready to be embedded
  * in a N'...' literal inside a RESTORE statement.
  */
-function buildSqlServerPath(dir, fileName) {
-  const sep = process.platform === "win32" ? "\\" : "/";
+export function buildSqlServerPath(dir, fileName, platform = process.platform) {
+  const sep = platform === "win32" ? "\\" : "/";
   const normalizedDir = String(dir).replace(/[\\/]+$/, "");
   const full = `${normalizedDir}${sep}${fileName}`;
   return full.replace(/'/g, "''");
@@ -135,7 +135,7 @@ export async function backupAndRestore(cfg, sourceDb, targetDb, { debug = false 
 
   const backupQ = `backup database [${safeSource}] to disk = N'${backupFileSql}' with init, copy_only`;
   await queryScalar(cfg, backupQ, "master", { debug });
-  
+
   const files = await queryRows(
     cfg,
     `set nocount on;

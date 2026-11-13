@@ -8,7 +8,10 @@
   },
   "type": "module",
   "scripts": {
-    "test": "node bin/sstr.js"
+    "test": "node --test --experimental-test-module-mocks \"tests/**/*.test.js\"",
+    "test:coverage": "node --test --experimental-test-module-mocks --experimental-test-coverage \"tests/**/*.test.js\"",
+    "test:integration": "node scripts/test-integration.mjs",
+    "start": "node bin/sstr.js"
   },
   "repository": {
     "type": "git",
@@ -17,8 +20,13 @@
   "keywords": [
     "sqlcmd",
     "sql",
+    "sql server",
+    "sqlserver",
     "test-runner",
-    "ssdt"
+    "ssdt",
+    "tdd",
+    "unit test",
+    "unit-test"
   ],
   "files": [
     "bin",

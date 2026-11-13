@@ -1,0 +1,18 @@
+{
+  "connection": {
+    "server": "localhost",
+    "username": "",
+    "password": "",
+    "trustedConnection": true,
+    "encrypt": false,
+    "trustServerCertificate": true
+  },
+  "loginTimeout": 15,
+  "queryTimeout": 180,
+  "scripts": {
+    "warmUp": "./setup.sql",
+    "coolDown": "",
+    "preScript": "",
+    "postScript": ""
+  }
+}

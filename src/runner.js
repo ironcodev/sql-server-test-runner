@@ -308,7 +308,7 @@ export async function run(
               procedure: full,
               passed: true,
               error: null,
-              durationMs: 0,
+              durationMs: null,
               skipped: true,
             });
             testedProcedures.add(full);
@@ -346,7 +346,12 @@ export async function run(
           }
 
           const succeeded = execRes.code === 0;
-          const errorText = (execRes.stderr || execRes.stdout || "").trim();
+          const stderr = (execRes.stderr || "").trim();
+          const stdout = (execRes.stdout || "").trim();
+          // Remove the assertion marker from stdout.
+          const cleanStdout = stdout.replace(/SSTR_ASSERTION\s*/g, "").trim();
+          const errorText = stderr || cleanStdout;
+          const hasAssertion = (execRes.stdout || "").includes("SSTR_ASSERTION");
 
           let passed;
           let resultError = null;
@@ -371,13 +376,22 @@ export async function run(
             }
           }
 
+          // Warn when a test passed without calling any assertion.
+          // This catches "empty tests" that only execute a procedure but verify nothing.
+          let warning = null;
+          if (passed && !hasAssertion && expectedThrow === false) {
+            warning = "Test passed without calling any assertion. " + "Did you forget to add an Assert.* call?";
+          }
+
           reporter.addResult({
             file,
             procedure: full,
             passed,
             error: resultError,
             durationMs: logExec ? t2 : null,
+            warning,
           });
+
           testedProcedures.add(full);
 
           if (!passed && bail) {
