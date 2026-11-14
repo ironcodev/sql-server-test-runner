@@ -15,8 +15,11 @@ In Short:
 
 - **CLI:** `sstr`
 - **Config file:** `sstr.config.json`
-- **Node.js:** >= 18
-- **Requires:** `sqlcmd` on `PATH`
+
+## Requirements
+
+- **Node.js >= 22** (LTS). Node 18 is end-of-life and is not supported.
+- `sqlcmd` available on `PATH` (comes with SQL Server Command Line Utilities / SSMS / mssql-tools)
 
 ---
 

@@ -1,6 +1,6 @@
 {
   "name": "sql-server-test-runner",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A simple test runner for SQL Server databases that executes .sql scripts containing sp unit tests using sqlcmd and reports failed sp executions.",
   "main": "src/index.js",
   "bin": {
@@ -44,6 +44,6 @@
   },
   "homepage": "https://github.com/ironcodev/sql-server-test-runner#readme",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   }
 }
