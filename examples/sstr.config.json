@@ -7,12 +7,7 @@
     "encrypt": false,
     "trustServerCertificate": true
   },
-  "loginTimeout": 15,
-  "queryTimeout": 180,
   "scripts": {
-    "warmUp": "./setup.sql",
-    "coolDown": "",
-    "preScript": "",
-    "postScript": ""
+    "warmUp": "./setup.sql"
   }
 }

@@ -1,8 +1,7 @@
 {
   "options": {
     "transaction": true,
-    "logExecution": false,
-    "skip": false
+    "logExecution": false
   },
   "tests": {
     "sum_with_null_args_should_return_null": {
@@ -13,6 +12,9 @@
     },
     "sum_of_numeric_strings_should_return_summation_of_them": {
       "logExecution": true
+    },
+    "sum_of_invalid_args_should_throw": {
+      "throws": true
     }
   }
 }

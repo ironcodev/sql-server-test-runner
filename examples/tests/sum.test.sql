@@ -88,3 +88,19 @@ end
 
 go
 
+create or alter proc sstr.sum_of_invalid_args_should_throw
+as
+begin
+    declare @a sql_variant
+    declare @b sql_variant
+    declare @r sql_variant
+
+    set @a = 'a'
+    set @b = getdate()
+    set @r = dbo.[Sum](@a, @b)
+
+    exec $(AssertSchema).Equals null, null
+end
+
+go
+

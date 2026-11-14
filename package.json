@@ -32,7 +32,9 @@
     "bin",
     "src",
     "docs",
+    "examples",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "author": "IronCode",
