@@ -4,7 +4,7 @@
   "description": "A simple test runner for SQL Server databases that executes .sql scripts containing sp unit tests using sqlcmd and reports failed sp executions.",
   "main": "src/index.js",
   "bin": {
-    "sstr": "./bin/sstr.js"
+    "sstr": "bin/sstr.js"
   },
   "type": "module",
   "scripts": {
