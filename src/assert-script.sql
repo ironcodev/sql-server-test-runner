@@ -242,6 +242,49 @@ begin
 end
 go
 
+-- ============================================================
+-- Large-value equality assertions.
+--
+-- sql_variant cannot hold nvarchar/varchar values longer than 4000
+-- characters. For large strings, use these procedures instead; they accept
+-- nvarchar(max) directly and compare the values as-is.
+--
+-- For non-string types (numbers, dates, etc.), cast to nvarchar(max) before
+-- calling:
+--   exec Assert.MaxEquals cast(@a as nvarchar(max)), cast(@b as nvarchar(max));
+-- ============================================================
+
+create or alter proc $(AssertSchema).MaxEquals (@a nvarchar(max), @b nvarchar(max))
+as
+begin
+    set nocount on;
+    print 'SSTR_ASSERTION';
+
+    -- Both NULL -> equal.
+    if @a is null and @b is null return;
+    -- Exactly one NULL -> not equal.
+    if @a is null or @b is null
+        raiserror('MaxEquals failed: one value is null and the other is not', 16, 1);
+
+    if @a <> @b
+        raiserror('MaxEquals failed: values are not equal', 16, 1);
+end
+go
+
+create or alter proc $(AssertSchema).MaxNotEquals (@a nvarchar(max), @b nvarchar(max))
+as
+begin
+    set nocount on;
+    print 'SSTR_ASSERTION';
+
+    if @a is null and @b is null
+        raiserror('MaxNotEquals failed: both values are null', 16, 1);
+
+    if @a is not null and @b is not null and @a = @b
+        raiserror('MaxNotEquals failed: values are equal', 16, 1);
+end
+go
+
 create or alter proc $(AssertSchema).IsGT (@a sql_variant, @b sql_variant)
 as
 begin
