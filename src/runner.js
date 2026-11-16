@@ -271,6 +271,26 @@ export async function run(
     for (const file of files) {
       if (bailed) break;
 
+      // Load per-file options (JSON next to the .sql file).
+      let optionsBundle;
+      
+      try {
+        optionsBundle = await loadTestOptions(file);
+      } catch (e) {
+        throw e;
+      }
+      for (const w of optionsBundle.warnings) {
+        progressLogger.error(`[sstr] Warning: ${w}`);
+      }
+
+      if (toBool(optionsBundle.options.skip, false)) {
+        initLogger(`  - ${file}  (skipped)`);
+        continue;
+      }
+
+      // Now announce that we are running this file.
+      progressLogger.log(`  ${file}`);
+
       if (scripts.preScript) {
         const p = resolvePath(cwd, scripts.preScript);
         const res = await runScriptOnDb(cfg, targetDb, p, {
@@ -282,19 +302,6 @@ export async function run(
             `preScript failed for "${file}":\n${res.stderr || res.stdout}`,
           );
         }
-      }
-
-      progressLogger.log(`  ${file}`);
-
-      // Load per-file options (JSON next to the .sql file).
-      let optionsBundle;
-      try {
-        optionsBundle = await loadTestOptions(file);
-      } catch (e) {
-        throw e;
-      }
-      for (const w of optionsBundle.warnings) {
-        progressLogger.error(`[sstr] Warning: ${w}`);
       }
 
       const t0 = nowMs();
