@@ -249,8 +249,8 @@ export async function run(
     reporter.setFiles(files);
     progressLogger.log(`Found ${files.length} test script file(s).`);
 
-    initLogger.log("Running tests ...");
-    
+    initLogger("Running tests ...");
+
     const scripts = cfg.scripts || {};
 
     if (scripts.warmUp) {
@@ -284,7 +284,7 @@ export async function run(
         }
       }
 
-      progressLogger.log(`Running test script: ${file}`);
+      progressLogger.log(`  ${file}`);
 
       // Load per-file options (JSON next to the .sql file).
       let optionsBundle;
@@ -459,6 +459,24 @@ export async function run(
           );
         }
       }
+
+      const fileResults = reporter.results.filter((r) => r.file === file);
+      const pass = fileResults.filter((r) => r.passed && !r.skipped).length;
+      const fail = fileResults.filter((r) => !r.passed && !r.skipped).length;
+      const skipped = fileResults.filter((r) => r.skipped).length;
+
+      let summary;
+      if (fail > 0) {
+        summary = `  x ${file}  (${pass} pass, ${fail} fail${skipped ? `, ${skipped} skipped` : ""})`;
+      } else if (fileResults.length === 0) {
+        summary = `  - ${file}  (no test procedures found)`;
+      } else if (pass === 0 && skipped > 0) {
+        // All tests were skipped.
+        summary = `  - ${file}  (${skipped} skipped)`;
+      } else {
+        summary = `  + ${file}  (${pass} pass, ${fail} fail${skipped ? `, ${skipped} skipped` : ""})`;
+      }
+      initLogger(summary);
     }
 
     if (!bailed && scripts.coolDown) {
@@ -474,6 +492,7 @@ export async function run(
     }
 
     reporter.print();
+
     return reporter;
   } finally {
     if (!keepDb) {

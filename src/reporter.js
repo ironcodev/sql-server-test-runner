@@ -33,7 +33,15 @@ class BaseReporter {
     this.files = files;
   }
 
-  addResult({ file, procedure, passed, error, durationMs = null, skipped = false, warning = null }) {
+  addResult({
+    file,
+    procedure,
+    passed,
+    error,
+    durationMs = null,
+    skipped = false,
+    warning = null,
+  }) {
     this.results.push({
       file,
       procedure,
@@ -84,7 +92,14 @@ export class ConsoleReporter extends BaseReporter {
       const skipped = list.filter((x) => x.skipped).length;
       const pass = list.filter((x) => x.passed && !x.skipped).length;
       const fail = list.filter((x) => !x.passed && !x.skipped).length;
-      const badge = fail > 0 ? c("red", "FAIL") : list.length > 0 ? c("green", "PASS") : c("gray", "EMPTY");
+      const badge =
+        fail > 0
+          ? c("red", "FAIL")
+          : pass > 0
+            ? c("green", "PASS")
+            : skipped > 0
+              ? c("gray", "SKIP")
+              : c("gray", "EMPTY");
       console.log(`  - ${f} [${badge}]`);
       console.log(
         `      procedures: ${list.length}, pass: ${pass}, fail: ${fail}${skipped ? `, skipped: ${skipped}` : ""}`,
@@ -145,16 +160,22 @@ export class ConsoleReporter extends BaseReporter {
 
     console.log("----------------------------------------------");
     const passLabel = c("green", `pass: ${passed}`);
-    const failLabel = failed > 0 ? c("red", `fail: ${failed}`) : c("gray", `fail: ${failed}`);
+    const failLabel =
+      failed > 0 ? c("red", `fail: ${failed}`) : c("gray", `fail: ${failed}`);
     const skipLabel = skipped > 0 ? `, skipped: ${skipped}` : "";
-    const warnLabel = warningCount > 0 ? c("yellow", `, warnings: ${warningCount}`) : "";
-    console.log(`Total: ${total}, ${passLabel}, ${failLabel}${skipLabel}${warnLabel}`);
+    const warnLabel =
+      warningCount > 0 ? c("yellow", `, warnings: ${warningCount}`) : "";
+    console.log(
+      `Total: ${total}, ${passLabel}, ${failLabel}${skipLabel}${warnLabel}`,
+    );
 
     // Total execution time (only for tests that enabled logExecution).
     const withTime = this.results.filter((r) => r.durationMs != null);
     if (withTime.length > 0) {
       const totalMs = withTime.reduce((sum, r) => sum + r.durationMs, 0);
-      console.log(`Measured execution time: ${totalMs} ms across ${withTime.length} test(s)`);
+      console.log(
+        `Measured execution time: ${totalMs} ms across ${withTime.length} test(s)`,
+      );
     }
 
     console.log(c("cyan", "=============================================="));
@@ -229,18 +250,25 @@ export class JUnitReporter extends BaseReporter {
     for (const [file, list] of byFile) {
       const fileFail = list.filter((x) => !x.passed && !x.skipped).length;
       const fileSkip = list.filter((x) => x.skipped).length;
-      const fileMs = list.filter((x) => x.durationMs != null).reduce((sum, x) => sum + x.durationMs, 0);
+      const fileMs = list
+        .filter((x) => x.durationMs != null)
+        .reduce((sum, x) => sum + x.durationMs, 0);
 
       lines.push(
         `  <testsuite name="${escapeXml(file)}" tests="${list.length}" failures="${fileFail}" skipped="${fileSkip}" time="${(fileMs / 1000).toFixed(3)}">`,
       );
       for (const r of list) {
-        const time = r.durationMs != null ? (r.durationMs / 1000).toFixed(3) : "0.000";
-        lines.push(`    <testcase classname="${escapeXml(file)}" name="${escapeXml(r.procedure)}" time="${time}">`);
+        const time =
+          r.durationMs != null ? (r.durationMs / 1000).toFixed(3) : "0.000";
+        lines.push(
+          `    <testcase classname="${escapeXml(file)}" name="${escapeXml(r.procedure)}" time="${time}">`,
+        );
         if (r.skipped) {
           lines.push("      <skipped/>");
         } else if (!r.passed) {
-          lines.push(`      <failure message="test failed"><![CDATA[${r.error || ""}]]></failure>`);
+          lines.push(
+            `      <failure message="test failed"><![CDATA[${r.error || ""}]]></failure>`,
+          );
         }
         if (r.warning) {
           lines.push(`      <system-out>${escapeXml(r.warning)}</system-out>`);
