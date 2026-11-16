@@ -1,6 +1,6 @@
 import { test, describe, mock, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile, mkdir, rm } from "fs/promises";
+import { mkdtemp, writeFile, mkdir, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { readTextFile } from "../src/file-utils.js";

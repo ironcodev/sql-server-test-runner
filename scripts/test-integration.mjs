@@ -1,5 +1,5 @@
 import { spawn } from "child_process";
-import { readFile, readdir, access } from "fs/promises";
+import { readdir, access } from "fs/promises";
 import { join } from "path";
 import { constants } from "fs";
 import { readTextFile } from "../src/file-utils";
