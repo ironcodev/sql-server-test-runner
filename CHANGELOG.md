@@ -7,7 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - 2025-01-01
+## [2.0.0] - 2026-11-16
+
+### Removed
+
+- **Breaking:** removed the following assertion procedures from `sstr`.
+  Use [DbMold](https://github.com/ironcodev/dbmold) instead:
+  - `TableExists`, `TableNotExists`
+  - `ColumnExists`, `ColumnNotExists`
+  - `ForeignKeyExists`, `ForeignKeyNotExists`
+  - `DefaultExists`, `DefaultNotExists`
+  - `RecordExists`, `RecordNotExists`
+- Removed the internal helpers `sstr._parse_table_column`,
+  `sstr._parse_column_list`, and `sstr._normalize_default`, which were only
+  used by the removed procedures.
+
+### Added
+
+- Link to [DbMold](https://github.com/ironcodev/dbmold) in the README and
+  docs for users who need general-purpose SQL helpers.
+
+### Changed
+
+- `sstr` now focuses exclusively on **test assertions** (`IsTrue`, `Equals`,
+  `IsBetween`, etc.). For schema-object checks, install DbMold.
+
+## [1.0.0] - 2026-11-14
 
 ### Added
 

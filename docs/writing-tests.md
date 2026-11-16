@@ -231,6 +231,7 @@ go
 ```
 
 ## Example: schema assertions
+You can use [DbMold](https://github.com/ironcodev/dbmold) helper functions to check database schema based on your need. Then use `isTrue` or `IsFalse` for assertons.
 
 ```sql
 create or alter proc test_schema_has_expected_objects
@@ -238,10 +239,20 @@ as
 begin
     set nocount on;
 
-    exec Assert.TableExists      'dbo.Users';
-    exec Assert.ColumnExists     'dbo.Users.email';
-    exec Assert.ForeignKeyExists 'dbo.Orders.UserId', 'Users.Id';
-    exec Assert.DefaultExists    'dbo.Users.createdAt', 'getdate()';
+    declare @table_exists   bit
+    declare @column_exists  bit
+    declare @fk_exists      bit
+    declare @default_exists bit
+
+    set @table_exists   = m.table_exists('dbo.Users')
+    set @column_exists  = m.column_exists('Users.Email')
+    set @fk_exists      = m.foreign_key_exists('Orders.UserId', 'Users.Id')
+    set @default_exists = m.default_exists('dbo.Users.CreatedAt', 'getdate()')
+
+    exec Assert.IsTrue @table_exists;
+    exec Assert.IsTrue @column_exists;
+    exec Assert.IsTrue @fk_exists;
+    exec Assert.IsTrue @default_exists;
 end
 go
 ```

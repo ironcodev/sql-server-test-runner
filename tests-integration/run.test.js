@@ -12,6 +12,14 @@ import { randomUUID } from "crypto";
 // `scripts/test-integration.mjs` sets it before running.
 const enabled = Boolean(process.env.SQLSERVER_HOST);
 
+if (!enabled && !process.env.SSTR_SKIP_INTEGRATION_WARNING) {
+  console.warn(
+    "Warning: SQLSERVER_HOST is not set. Integration tests will be skipped.\n" +
+      '  Create a ".env.integration" file (see ".env.integration.example")\n' +
+      "  or run `npm run test:integration` which loads it automatically.",
+  );
+}
+
 function baseConfig(overrides = {}) {
   const trusted = process.env.SQLSERVER_TRUSTED === "1";
   return {
@@ -110,8 +118,16 @@ describe("integration: run", { skip: !enabled }, () => {
     const reporter = await run(cfg, { cwd: root });
 
     assert.equal(reporter.results.length, 1, "expected exactly one result");
-    assert.equal(reporter.results[0].passed, false, "expected the test to fail");
-    assert.match(reporter.results[0].error, /Equals failed/, "expected the error to mention 'Equals failed'");
+    assert.equal(
+      reporter.results[0].passed,
+      false,
+      "expected the test to fail",
+    );
+    assert.match(
+      reporter.results[0].error,
+      /Equals failed/,
+      "expected the error to mention 'Equals failed'",
+    );
     assert.equal(reporter.hasFailures, true, "expected hasFailures to be true");
   });
 

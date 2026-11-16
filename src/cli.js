@@ -7,8 +7,14 @@ import { createInterface } from "readline/promises";
 import { loadConfig, validateConfig, mergeCliOverrides } from "./config.js";
 import { run } from "./runner.js";
 import { discoverTestFiles } from "./discover.js";
-import { checkConnection, databaseExists, dropDatabase, listSstDatabases } from "./database.js";
+import {
+  checkConnection,
+  databaseExists,
+  dropDatabase,
+  listSstDatabases,
+} from "./database.js";
 import { runSqlcmd, buildConnectionArgs } from "./sqlcmd.js";
+import { loadSstrEnv } from "./env.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -23,7 +29,9 @@ function getName(version) {
 
 function printBanner(version) {
   console.log(getName(version));
-  console.log("  A test runner for unit testing SQL Server databases, powered by sqlcmd.");
+  console.log(
+    "  A test runner for unit testing SQL Server databases, powered by sqlcmd.",
+  );
   console.log("");
   console.log('Run "sstr run" to execute tests, or "sstr --help" for usage.');
 }
@@ -101,6 +109,13 @@ Clean options (clean only):
   --keep-backups                Only drop databases; do not delete .bak files.
   -y, --yes                     Skip confirmation prompts.
 
+Environment:
+  SSTR_SQLCMD_PATH              Path to the sqlcmd executable. If not set,
+                                sstr uses "sqlcmd.exe" on Windows and
+                                "sqlcmd" elsewhere, resolved via PATH.
+                                Can also be set in ".env.sstr" (keys starting with
+                                "SSTR_" are loaded automatically).
+
 Examples:
   sstr
   sstr run
@@ -153,7 +168,9 @@ async function fileExists(path) {
 
 async function confirm(question) {
   if (!process.stdin.isTTY) {
-    throw new Error('Refusing to prompt without a TTY. Use "--yes" to proceed non-interactively.');
+    throw new Error(
+      'Refusing to prompt without a TTY. Use "--yes" to proceed non-interactively.',
+    );
   }
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   try {
@@ -169,7 +186,12 @@ async function confirm(question) {
 // ============================================================
 
 async function prepareContext(opts) {
-  const colorEnabled = opts.color === true ? true : opts.color === false ? false : Boolean(process.stdout.isTTY);
+  const colorEnabled =
+    opts.color === true
+      ? true
+      : opts.color === false
+        ? false
+        : Boolean(process.stdout.isTTY);
 
   let cfg = await loadConfig(opts.cwd, opts.env, {
     configPath: opts.configPath,
@@ -294,7 +316,9 @@ export async function cmdHelp(opts) {
     return;
   }
 
-  throw new Error(`Unknown help topic: ${topic}. ${GENERAL_HELP_TOPICS.trim()}`);
+  throw new Error(
+    `Unknown help topic: ${topic}. ${GENERAL_HELP_TOPICS.trim()}`,
+  );
 }
 
 const DEFAULT_CONFIG_JSON = `{
@@ -331,7 +355,9 @@ const DEFAULT_CONFIG_JSON = `{
 export async function cmdInit(opts) {
   const target = join(opts.cwd, "sstr.config.json");
   if (await fileExists(target)) {
-    throw new Error(`"sstr.config.json" already exists in "${opts.cwd}". Aborting.`);
+    throw new Error(
+      `"sstr.config.json" already exists in "${opts.cwd}". Aborting.`,
+    );
   }
   await writeFile(target, DEFAULT_CONFIG_JSON, "utf-8");
   console.log(`Created "${target}".`);
@@ -339,10 +365,13 @@ export async function cmdInit(opts) {
 
 export async function cmdConnect(opts) {
   if (opts.reportType !== "console") {
-    throw new Error(`"connect" only supports --report-type console (got "${opts.reportType}").`);
+    throw new Error(
+      `"connect" only supports --report-type console (got "${opts.reportType}").`,
+    );
   }
   if (opts.bail) throw new Error('"--bail" is only supported by "sstr run".');
-  if (opts.keepDb) throw new Error('"--keep-db" is only supported by "sstr run".');
+  if (opts.keepDb)
+    throw new Error('"--keep-db" is only supported by "sstr run".');
 
   const { cfg } = await prepareContext(opts);
 
@@ -358,7 +387,15 @@ export async function cmdConnect(opts) {
   let defaultDb = null;
   try {
     const args = buildConnectionArgs(cfg, { database: "master" });
-    args.push("-h", "-1", "-W", "-s", "|", "-Q", "set nocount on; select @@version as v, db_name() as d;");
+    args.push(
+      "-h",
+      "-1",
+      "-W",
+      "-s",
+      "|",
+      "-Q",
+      "set nocount on; select @@version as v, db_name() as d;",
+    );
     const res = await runSqlcmd(args, { debug: opts.detailed });
     if (res.code === 0) {
       const line = res.stdout.trim().split(/\r?\n/)[0] || "";
@@ -396,10 +433,13 @@ export async function cmdList(opts) {
 
 export async function cmdClean(opts) {
   if (opts.reportType !== "console") {
-    throw new Error(`"clean" only supports --report-type console (got "${opts.reportType}").`);
+    throw new Error(
+      `"clean" only supports --report-type console (got "${opts.reportType}").`,
+    );
   }
   if (opts.bail) throw new Error('"--bail" is only supported by "sstr run".');
-  if (opts.keepDb) throw new Error('"--keep-db" is only supported by "sstr run".');
+  if (opts.keepDb)
+    throw new Error('"--keep-db" is only supported by "sstr run".');
 
   const { cfg } = await prepareContext(opts);
 
@@ -423,7 +463,10 @@ export async function cmdClean(opts) {
     try {
       const entries = await readdir(backupPath, { withFileTypes: true });
       for (const e of entries) {
-        const isSstrBackup = e.isFile() && e.name.startsWith("sstr_") && e.name.toLowerCase().endsWith(".bak");
+        const isSstrBackup =
+          e.isFile() &&
+          e.name.startsWith("sstr_") &&
+          e.name.toLowerCase().endsWith(".bak");
 
         if (isSstrBackup) {
           backupFiles.push(join(backupPath, e.name));
@@ -469,7 +512,9 @@ export async function cmdClean(opts) {
 
   if (!opts.yes) {
     console.log("");
-    const ok = await confirm("Proceed with cleanup? This cannot be undone. [y/N] ");
+    const ok = await confirm(
+      "Proceed with cleanup? This cannot be undone. [y/N] ",
+    );
     if (!ok) {
       console.log("Aborted.");
       return;
@@ -499,7 +544,9 @@ export async function cmdClean(opts) {
   }
 
   console.log("");
-  console.log(`Done. Dropped ${droppedCount} database(s), removed ${deletedCount} file(s).`);
+  console.log(
+    `Done. Dropped ${droppedCount} database(s), removed ${deletedCount} file(s).`,
+  );
 }
 
 export async function cmdRun(opts) {
@@ -524,7 +571,16 @@ export async function cmdRun(opts) {
 // Argument parsing
 // ============================================================
 
-const ALLOWED_COMMANDS = ["init", "run", "list", "config", "connect", "clean", "options", "help"];
+const ALLOWED_COMMANDS = [
+  "init",
+  "run",
+  "list",
+  "config",
+  "connect",
+  "clean",
+  "options",
+  "help",
+];
 
 function parseCliArgs(argv) {
   const opts = {
@@ -551,7 +607,9 @@ function parseCliArgs(argv) {
   if (args[0] && !args[0].startsWith("-")) {
     opts.command = args.shift();
     if (!ALLOWED_COMMANDS.includes(opts.command)) {
-      throw new Error(`Unknown command: ${opts.command}. Allowed: ${ALLOWED_COMMANDS.join(", ")}.`);
+      throw new Error(
+        `Unknown command: ${opts.command}. Allowed: ${ALLOWED_COMMANDS.join(", ")}.`,
+      );
     }
     // "help" takes an optional topic argument.
     if (opts.command === "help" && args[0] && !args[0].startsWith("-")) {
@@ -606,7 +664,9 @@ function parseCliArgs(argv) {
       const v = args.shift();
       if (!v) throw new Error("Missing value for --report-type.");
       if (!["console", "json", "junit"].includes(v)) {
-        throw new Error(`Invalid --report-type "${v}". Allowed: console, json, junit.`);
+        throw new Error(
+          `Invalid --report-type "${v}". Allowed: console, json, junit.`,
+        );
       }
       opts.reportType = v;
       continue;
@@ -623,7 +683,8 @@ function parseCliArgs(argv) {
       const v = args.shift();
       if (!v) throw new Error("Missing value for --query-timeout.");
       const n = Number(v);
-      if (!Number.isFinite(n) || n < 0) throw new Error("--query-timeout must be a non-negative number.");
+      if (!Number.isFinite(n) || n < 0)
+        throw new Error("--query-timeout must be a non-negative number.");
       opts.queryTimeout = n;
       continue;
     }
@@ -676,8 +737,12 @@ export async function runCLI(argv) {
     return;
   }
 
+  await loadSstrEnv(opts.cwd);
+
   if (opts.command == null) {
-    const flags = argv.filter((a) => !a.startsWith("-") || a.startsWith("--")).join(" ");
+    const flags = argv
+      .filter((a) => !a.startsWith("-") || a.startsWith("--"))
+      .join(" ");
     const hint = flags ? `sstr run ${flags}` : "sstr run";
     throw new Error(
       `Missing command. Allowed commands: ${ALLOWED_COMMANDS.join(", ")}. ` +

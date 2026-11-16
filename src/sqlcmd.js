@@ -1,6 +1,27 @@
 import { spawn } from "child_process";
 
 /**
+ * Resolves the sqlcmd executable to run.
+ *
+ * Priority:
+ *   1. SSTR_SQLCMD_PATH (if set)
+ *   2. "sqlcmd.exe" on Windows, "sqlcmd" elsewhere
+ *
+ * SSTR_SQLCMD_PATH is useful in environments where sqlcmd is not on PATH
+ * (locked-down servers, CI runners) or when multiple sqlcmd versions are
+ * installed and a specific one must be used.
+ */
+function resolveSqlcmdCommand() {
+  if (
+    process.env.SSTR_SQLCMD_PATH &&
+    process.env.SSTR_SQLCMD_PATH.trim() !== ""
+  ) {
+    return process.env.SSTR_SQLCMD_PATH;
+  }
+  return process.platform === "win32" ? "sqlcmd.exe" : "sqlcmd";
+}
+
+/**
  * Runs sqlcmd with the given arguments.
  * Returns { code, stdout, stderr }.
  *
@@ -10,13 +31,15 @@ import { spawn } from "child_process";
  * are passed verbatim to the process and no escaping is needed.
  */
 export function runSqlcmd(args, { cwd, input, debug = false } = {}) {
-  const printable = ["sqlcmd", ...args].join(" ");
+  const command = resolveSqlcmdCommand();
+  const printable = [command, ...args].join(" ");
+  
   if (debug) {
     console.error(`[sstr] $ ${printable}`);
   }
 
   return new Promise((resolve) => {
-    const child = spawn("sqlcmd", args, {
+    const child = spawn(command, args, {
       cwd,
       shell: false,
       windowsHide: true,

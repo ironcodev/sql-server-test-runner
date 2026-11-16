@@ -44,7 +44,7 @@ But "standard" does not mean "the only reasonable choice." If you are a Node.js 
 | **Expected failures** | Possible but not a dedicated feature. | `throws: true` (any error) or `throws: <number>` (specific SQL Server error number). |
 | **Per-test setup/teardown** | Possible via tSQLt helpers. | `preScript` / `postScript` in the per-test JSON file. |
 | **Multiple test schemas** | Not a first-class concept. | `testSchema` accepts a comma-separated list. The `sstr` schema is always treated as a test schema. |
-| **Built-in assertion set** | Full tSQLt assertion set. | 24 assertions including schema objects, foreign keys (composite), defaults (with value comparison), and JSON-filtered record checks. |
+| **Built-in assertion set** | Full tSQLt assertion set. | 14 value assertions (`Equals`, `IsTrue`, `IsBetween`, ...). For schema-object checks, use [DbMold](https://github.com/ironcodev/dbmold). |
 | **Reports** | Possible via custom scripts. | Built-in `console`, `json`, and `junit` reports. |
 | **CI integration** | Possible, often via custom scripts. | `--report-type junit` drops straight into GitHub Actions, GitLab CI, Azure Pipelines, and any JUnit-compatible dashboard. |
 | **Connection check** | Not a dedicated command. | `sstr connect` verifies the connection and prints server info. |
@@ -194,6 +194,14 @@ Total: 1, pass: 1, fail: 0
 
 ---
 
+## Related projects
+
+- [DbMold](https://github.com/ironcodev/dbmold) — idempotent, forward-only schema
+  manipulation for SQL Server. If you need `table_exists`, `column_exists`,
+  `default_exists`, `record_exists`, or idempotent DDL helpers, install DbMold
+  alongside `sstr`. `sstr` focuses on test assertions; DbMold focuses on
+  general-purpose SQL helpers.
+  
 ## License
 
 MIT

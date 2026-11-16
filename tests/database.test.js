@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 const sqlcmdCalls = [];
 
 mock.module("../src/sqlcmd.js", {
-  namedExports: {
+  exports: {
     runSqlcmd: async (args) => {
       sqlcmdCalls.push(args);
       const sql = args.join(" ");

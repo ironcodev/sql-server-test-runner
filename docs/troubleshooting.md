@@ -17,6 +17,24 @@ apt-get install sqlcmd
 
 Verify with `sqlcmd -?`. On Windows, `where sqlcmd` should print a path.
 
+### `spawn sqlcmd ENOENT` on Windows
+
+If `where sqlcmd` (or `where.exe sqlcmd`) finds `sqlcmd` but Node.js still
+reports `ENOENT`, the terminal (or `vscode`) was likely opened before `sqlcmd`
+was installed or before `PATH` was updated. Close and reopen the terminal
+(or `vscode`) so the new `PATH` is picked up.
+
+You can also use the following environment variable in `.env.sstr` file to manually set `sqlcmd` path.
+
+If `sqlcmd` is installed but not on `PATH`
+(e.g. on locked-down servers or CI runners), or if you have multiple `sqlcmd`
+versions installed and want to use a specific one, set `SSTR_SQLCMD_PATH`:
+
+```powershell
+$env:SSTR_SQLCMD_PATH = "C:\Program Files\SqlCmd\sqlcmd.exe"
+sstr run
+```
+
 ## `Login failed for user ...`
 
 - Check `connection.server`, `connection.username`, `connection.password`.

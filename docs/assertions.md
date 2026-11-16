@@ -1,5 +1,11 @@
 # Assertion Procedures
 
+> **Note:** `sstr` only ships **test assertions**. If you need general-purpose
+> helpers like `table_exists`, `column_exists`, `default_exists`, or `record_exists`,
+> install [DbMold](https://github.com/ironcodev/dbmold). DbMold provides them as
+> reusable T-SQL functions (`m.table_exists`, `m.column_exists`, ...) that you can
+> use in your own procedures and functions.
+
 Before running any test, `sstr` deploys a set of assertion stored procedures into the schema configured by `assertSchema` (default `Assert`). Use them inside your test procedures to express expectations.
 
 If an assertion fails, it raises an error with severity 16. `sqlcmd -b` turns that into a non-zero exit code, and `sstr` marks the test as failed.
@@ -50,48 +56,6 @@ All parameters are `sql_variant` so you can pass native values (`int`, `decimal`
 
 `Equals` and `NotEquals` compare values as strings. Numeric comparisons (`IsGT`, `IsBetween`, …) cast to `float`.
 
-### Schema objects
-
-| Procedure | Signature | Fails when |
-|---|---|---|
-| `TableExists` | `@table` | table does not exist. |
-| `TableNotExists` | `@table` | table exists. |
-| `ColumnExists` | `@table_column` | column does not exist. `@table_column` is `schema.table.column`, e.g. `'dbo.Users.email'`. |
-| `ColumnNotExists` | `@table_column` | column exists. |
-| `ForeignKeyExists` | `@fk_column, @pk_column` | no foreign key from `@fk_column` to `@pk_column` exists. Both are `schema.table.column`. |
-| `ForeignKeyExists` | `@fk_column, @pk_column` | no foreign key from `@fk_column` to `@pk_column` exists. Each argument is `schema.table.(col1,col2,...)`. |
-| `ForeignKeyNotExists` | `@fk_column, @pk_column` | a foreign key from `@fk_column` to `@pk_column` exists. |
-| `DefaultExists` | `@table_column, @expected_value = null` | the column has no default constraint, or its value does not match `@expected_value`. |
-| `DefaultNotExists` | `@table_column, @expected_value = null` | the column has a default constraint (and, if `@expected_value` is provided, its value matches). |
-
-`@table_column` is `schema.table.column` (e.g. `'dbo.Users.email'`). `@fk_column` is the column that holds the foreign key, `@pk_column` is the referenced column.
-
-#### Default value comparison
-
-`DefaultExists` and `DefaultNotExists` compare the default constraint's definition with `@expected_value`. Before comparing:
-
-- Both strings are trimmed.
-- Wrapping parentheses are removed repeatedly, so `((10))` and `(10)` both become `10`.
-- The comparison uses the database collation (usually case-insensitive).
-
-If `@expected_value` is `null`, only the **presence** of the default constraint is checked.
-
-### Records
-
-| Procedure | Signature | Fails when |
-|---|---|---|
-| `RecordExists` | `@table, @json` | no row matches the JSON filter. |
-| `RecordNotExists` | `@table, @json` | a row matches the JSON filter. |
-
-`@json` is a JSON object whose keys are column names and whose values are compared for equality. All conditions are ANDed. A JSON `null` becomes an `IS NULL` check. An empty object (`N'{}'`) matches every row.
-
-```sql
-exec Assert.RecordExists    'dbo.Users', N'{ "id": 10, "name": "Alice" }';
-exec Assert.RecordNotExists 'dbo.Users', N'{ "id": 99 }';
-exec Assert.RecordExists    'dbo.Users', N'{ "deletedAt": null }';
-exec Assert.RecordExists    'dbo.Users', N'{}';   -- any row exists
-```
-
 ## Examples
 
 ```sql
@@ -106,29 +70,6 @@ exec Assert.IsBetween @result, 10, 20;
 -- Null
 exec Assert.IsNull @maybeNull;
 exec Assert.IsNotNull @result;
-
--- Schema
-exec Assert.TableExists      'dbo.Users';
-exec Assert.ColumnExists     'dbo.Users.email';
-
--- Records
-exec Assert.RecordExists 'dbo.Users', N'{ "id": 10 }';
-
--- Defaults
-exec Assert.DefaultExists    'dbo.Users.createdAt';                    -- only presence
-exec Assert.DefaultExists    'dbo.Users.status', 'active';             -- presence + value
-exec Assert.DefaultExists    'dbo.Users.age', '10';                    -- matches '((10))' or '(10)'
-exec Assert.DefaultNotExists 'dbo.Users.updatedAt';                    -- no default at all
-exec Assert.DefaultNotExists 'dbo.Users.status', 'inactive';           -- no default with this value
-
--- Foreign Keys
--- Single-column foreign key
-exec Assert.ForeignKeyExists    'dbo.Orders.UserId', 'dbo.Users.Id';
-exec Assert.ForeignKeyNotExists 'dbo.Orders.UserId', 'dbo.Users.Id';
-
--- Composite foreign key (note the parentheses)
-exec Assert.ForeignKeyExists    'dbo.ChildTable.(Col1,Col2)', 'dbo.ParentTable.(Col1,Col2)';
-exec Assert.ForeignKeyNotExists 'dbo.ChildTable.(Col1,Col2)', 'dbo.ParentTable.(Col1,Col2)';
 ```
 
 ## Limitations
@@ -142,3 +83,11 @@ exec Assert.ForeignKeyNotExists 'dbo.ChildTable.(Col1,Col2)', 'dbo.ParentTable.(
   exec Assert.IsGT cast(@a as float), cast(@b as float);
   ```
   (Date-specific assertions may be added in future versions.)
+
+## Related projects
+
+- [DbMold](https://github.com/ironcodev/dbmold) — idempotent, forward-only schema
+  manipulation for SQL Server. Provides `m.table_exists`, `m.column_exists`,
+  `m.default_exists`, `m.get_default`, `m.column_info`, and idempotent
+  `create_*` / `drop_*` procedures. If you need general-purpose SQL helpers,
+  install DbMold alongside `sstr`.

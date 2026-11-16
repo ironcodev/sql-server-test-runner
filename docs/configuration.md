@@ -158,3 +158,22 @@ Run with:
 ```bash
 sstr run --env development
 ```
+
+### Environment variables
+
+`sstr` reads `.env.sstr` from the working directory (if present) and copies
+variables that start with `SSTR_` into the process environment. Existing
+environment variables take precedence.
+
+| Variable | Description |
+|---|---|
+| `SSTR_SQLCMD_PATH` | Path to the `sqlcmd` executable. Useful when `sqlcmd` is not on `PATH`, or when multiple versions are installed. |
+
+Example `.env.sstr`:
+
+```text
+SSTR_SQLCMD_PATH=C:\Program Files\SqlCmd\sqlcmd.exe
+```
+
+Add `.env.sstr` to your project's `.gitignore` if it contains machine-specific paths.
+

@@ -11,7 +11,7 @@ import { tmpdir } from "os";
 const sqlcmdCalls = [];
 
 mock.module("../src/sqlcmd.js", {
-  namedExports: {
+  exports: {
     runSqlcmd: async (args) => {
       sqlcmdCalls.push(args);
 
@@ -72,7 +72,7 @@ mock.module("../src/sqlcmd.js", {
 // ============================================================
 
 mock.module("../src/database.js", {
-  namedExports: {
+  exports: {
     checkConnection: async () => {},
     databaseExists: async (_cfg, dbName) => String(dbName).startsWith("existing_"),
     createDatabase: async () => {},
