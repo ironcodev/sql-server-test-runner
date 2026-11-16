@@ -26,11 +26,16 @@ class BaseReporter {
     this.results = [];
     this.files = [];
     this.skippedFiles = [];
+    this.runInfo = null;
     this.c = makeColorizer(color);
   }
 
   setFiles(files) {
     this.files = files;
+  }
+
+  setRunInfo(info) {
+    this.runInfo = info;
   }
 
   addResult({
@@ -77,6 +82,18 @@ export class ConsoleReporter extends BaseReporter {
     console.log(c("cyan", "=============================================="));
     console.log(c("cyan", " Test Report"));
     console.log(c("cyan", "=============================================="));
+
+    if (this.runInfo) {
+      const started = this.runInfo.startedAt.toLocaleString();
+      const finished = this.runInfo.finishedAt.toLocaleString();
+      const seconds = (this.runInfo.durationMs / 1000).toFixed(2);
+      console.log(``);
+      console.log(`Started:  ${started}`);
+      console.log(`Finished: ${finished}`);
+      console.log(`Duration: ${seconds}s`);
+      console.log("");
+    }
+
     console.log(`Test script files: ${this.files.length}`);
 
     const byFile = new Map();
@@ -197,6 +214,13 @@ export class JsonReporter extends BaseReporter {
     const totalMs = withTime.reduce((sum, r) => sum + r.durationMs, 0);
 
     const payload = {
+      runInfo: this.runInfo
+        ? {
+            startedAt: this.runInfo.startedAt.toISOString(),
+            finishedAt: this.runInfo.finishedAt.toISOString(),
+            durationMs: this.runInfo.durationMs,
+          }
+        : null,
       files: this.files,
       skippedFiles: this.skippedFiles,
       results: this.results,
@@ -234,11 +258,13 @@ export class JUnitReporter extends BaseReporter {
     const skipped = this.results.filter((r) => r.skipped).length;
     const withTime = this.results.filter((r) => r.durationMs != null);
     const totalMs = withTime.reduce((sum, r) => sum + r.durationMs, 0);
-
+    const timestamp = this.runInfo
+      ? this.runInfo.startedAt.toISOString().replace(/\.\d+Z$/, "")
+      : "";
     const lines = [];
     lines.push('<?xml version="1.0" encoding="UTF-8"?>');
     lines.push(
-      `<testsuites name="sstr" tests="${total}" failures="${failed}" skipped="${skipped}" time="${(totalMs / 1000).toFixed(3)}">`,
+      `<testsuites name="sstr" tests="${total}" failures="${failed}" skipped="${skipped}" time="${(totalMs / 1000).toFixed(3)}"${timestamp ? ` timestamp="${timestamp}"` : ""}>`,
     );
 
     const byFile = new Map();

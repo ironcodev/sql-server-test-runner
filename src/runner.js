@@ -151,6 +151,8 @@ export async function run(
     useTransaction = true,
   } = {},
 ) {
+  const startedAt = new Date();
+  const startMs = nowMs();
   const assertSchema = cfg.assertSchema || DEFAULT_ASSERT_SCHEMA;
   const testMatch = new RegExp(cfg.testMatch || DEFAULT_TEST_MATCH, "i");
 
@@ -273,7 +275,7 @@ export async function run(
 
       // Load per-file options (JSON next to the .sql file).
       let optionsBundle;
-      
+
       try {
         optionsBundle = await loadTestOptions(file);
       } catch (e) {
@@ -498,6 +500,10 @@ export async function run(
       }
     }
 
+    const finishedAt = new Date();
+    const durationMs = nowMs() - startMs;
+
+    reporter.setRunInfo({ startedAt, finishedAt, durationMs });
     reporter.print();
 
     return reporter;
