@@ -1,6 +1,7 @@
 import { readFile, access } from "fs/promises";
 import { join } from "path";
 import { constants } from "fs";
+import { readTextFile } from "./file-utils";
 
 async function fileExists(path) {
   try {
@@ -44,7 +45,7 @@ export async function loadSstrEnv(cwd) {
 
   let text;
   try {
-    text = await readFile(envPath, "utf-8");
+    text = await readTextFile(envPath);
   } catch {
     return;
   }

@@ -1,4 +1,4 @@
-import { readFile, writeFile, access, readdir, unlink } from "fs/promises";
+import { writeFile, access, readdir, unlink } from "fs/promises";
 import { join, dirname } from "path";
 import { constants } from "fs";
 import { fileURLToPath } from "url";
@@ -15,6 +15,7 @@ import {
 } from "./database.js";
 import { runSqlcmd, buildConnectionArgs } from "./sqlcmd.js";
 import { loadSstrEnv } from "./env.js";
+import { readTextFile } from "./file-utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -149,7 +150,7 @@ Exit codes:
 async function readPackageVersion() {
   const pkgPath = join(__dirname, "..", "package.json");
   try {
-    const raw = await readFile(pkgPath, "utf-8");
+    const raw = await readTextFile(pkgPath);
     const pkg = JSON.parse(raw);
     return pkg.version || "0.0.0";
   } catch {

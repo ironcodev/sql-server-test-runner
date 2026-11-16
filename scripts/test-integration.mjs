@@ -2,6 +2,7 @@ import { spawn } from "child_process";
 import { readFile, readdir, access } from "fs/promises";
 import { join } from "path";
 import { constants } from "fs";
+import { readTextFile } from "../src/file-utils";
 
 const ENV_FILE = ".env.integration";
 
@@ -37,7 +38,7 @@ function parseEnv(text) {
 
 // Load .env.integration if present.
 if (await fileExists(ENV_FILE)) {
-  const text = await readFile(ENV_FILE, "utf-8");
+  const text = await readTextFile(ENV_FILE);
   const vars = parseEnv(text);
   for (const [k, v] of Object.entries(vars)) {
     if (process.env[k] == null) {

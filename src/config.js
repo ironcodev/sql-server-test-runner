@@ -1,6 +1,7 @@
-import { readFile, access } from "fs/promises";
+import { access } from "fs/promises";
 import { join, isAbsolute } from "path";
 import { constants } from "fs";
+import { readTextFile } from "./file-utils";
 
 const BASE_CONFIG = "sstr.config.json";
 
@@ -24,7 +25,11 @@ async function fileExists(path) {
  *   shallow-merged.
  */
 export async function loadConfig(cwd, env, { configPath } = {}) {
-  const basePath = configPath ? (isAbsolute(configPath) ? configPath : join(cwd, configPath)) : join(cwd, BASE_CONFIG);
+  const basePath = configPath
+    ? isAbsolute(configPath)
+      ? configPath
+      : join(cwd, configPath)
+    : join(cwd, BASE_CONFIG);
 
   if (!(await fileExists(basePath))) {
     throw new Error(`Config file "${basePath}" not found.`);
@@ -38,17 +43,19 @@ export async function loadConfig(cwd, env, { configPath } = {}) {
 
   const envPath = env ? join(baseDir, `sstr.config.${env}.json`) : null;
 
-  const base = JSON.parse(await readFile(basePath, "utf-8"));
+  const base = JSON.parse(await readTextFile(basePath));
   let overrides = {};
 
   if (envPath && (await fileExists(envPath))) {
-    overrides = JSON.parse(await readFile(envPath, "utf-8"));
+    overrides = JSON.parse(await readTextFile(envPath));
   }
 
   const merged = { ...base };
   for (const key of Object.keys(overrides)) {
     if (
-      ["connection", "scripts", "sqlCmdOptions", "defaultTestOptions"].includes(key) &&
+      ["connection", "scripts", "sqlCmdOptions", "defaultTestOptions"].includes(
+        key,
+      ) &&
       base[key] &&
       typeof base[key] === "object" &&
       typeof overrides[key] === "object"
@@ -84,7 +91,10 @@ export function validateConfig(cfg) {
     throw new Error('"connection.server" is required.');
   }
 
-  const trusted = conn.trustedConnection === true || conn.trustedConnection === "true" || conn.trustedConnection === 1;
+  const trusted =
+    conn.trustedConnection === true ||
+    conn.trustedConnection === "true" ||
+    conn.trustedConnection === 1;
 
   if (!trusted) {
     if (conn.username && typeof conn.username !== "string") {
@@ -132,7 +142,10 @@ export function validateConfig(cfg) {
     throw new Error('"cleanupBackup" must be a boolean.');
   }
   if (cfg.defaultTestOptions != null) {
-    if (typeof cfg.defaultTestOptions !== "object" || Array.isArray(cfg.defaultTestOptions)) {
+    if (
+      typeof cfg.defaultTestOptions !== "object" ||
+      Array.isArray(cfg.defaultTestOptions)
+    ) {
       throw new Error('"defaultTestOptions" must be an object.');
     }
   }

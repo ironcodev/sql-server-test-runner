@@ -167,3 +167,18 @@ node -e "JSON.parse(require('fs').readFileSync('tests/sum.test.json','utf8'))"
 
 The warning does not stop the run. Check the spelling against the list in
 [Writing Tests](writing-tests.md#options).
+
+### UTF-16 or UTF-8 BOM files
+
+`sstr` reads all text files (test scripts, config files, per-test options,
+and its own assertion script) and converts them to UTF-8 internally. The
+following encodings are supported:
+
+- UTF-8 without BOM
+- UTF-8 with BOM
+- UTF-16 LE with BOM
+- UTF-16 BE with BOM
+
+If you still see garbled output, ensure the file is saved with one of these
+encodings and does not mix encodings. On Windows, Notepad sometimes saves
+files as UTF-16 LE with BOM; `sstr` handles this automatically.

@@ -1,5 +1,6 @@
-import { readFile, access } from "fs/promises";
+import { access } from "fs/promises";
 import { constants } from "fs";
+import { readTextFile } from "./file-utils";
 
 /**
  * Default options applied to every test when nothing else is specified.
@@ -60,7 +61,7 @@ export async function loadTestOptions(testFilePath) {
 
   let raw;
   try {
-    raw = await readFile(jsonPath, "utf-8");
+    raw = await readTextFile(jsonPath);
   } catch (e) {
     throw new Error(`Failed to read "${jsonPath}": ${e.message}`);
   }

@@ -1,4 +1,4 @@
-import { readFile, writeFile, unlink } from "fs/promises";
+import { writeFile, unlink } from "fs/promises";
 import { join, isAbsolute, dirname } from "path";
 import { fileURLToPath } from "url";
 import { tmpdir } from "os";
@@ -20,6 +20,7 @@ import {
   toBool,
   normalizeThrows,
 } from "./options.js";
+import { readTextFile } from "./file-utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -52,7 +53,7 @@ async function runScriptOnDb(
   // Read the original script.
   let scriptText;
   try {
-    scriptText = await readFile(scriptPath, "utf-8");
+    scriptText = await readTextFile(scriptPath);
   } catch (e) {
     throw new Error(`Failed to read "${scriptPath}": ${e.message}`);
   }
@@ -232,10 +233,7 @@ export async function run(
 
   try {
     progressLogger.log("Creating assertion procedures...");
-    const assertSql = await readFile(
-      join(__dirname, "assert-script.sql"),
-      "utf-8",
-    );
+    const assertSql = await readTextFile(join(__dirname, "assert-script.sql"));
     const assertRes = await runScriptTextOnDb(cfg, targetDb, assertSql, {
       assertSchema,
       debug: false,

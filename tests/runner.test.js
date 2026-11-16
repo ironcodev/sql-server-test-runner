@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile, mkdir, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
+import { readTextFile } from "../src/file-utils.js";
 
 // ============================================================
 // Mock sqlcmd.js BEFORE importing runner.js.
@@ -21,7 +22,7 @@ mock.module("../src/sqlcmd.js", {
         const filePath = args[iIndex + 1];
         let content = "";
         try {
-          content = await readFile(filePath, "utf-8");
+          content = await readTextFile(filePath);
         } catch {
           content = "";
         }
@@ -74,10 +75,12 @@ mock.module("../src/sqlcmd.js", {
 mock.module("../src/database.js", {
   exports: {
     checkConnection: async () => {},
-    databaseExists: async (_cfg, dbName) => String(dbName).startsWith("existing_"),
+    databaseExists: async (_cfg, dbName) =>
+      String(dbName).startsWith("existing_"),
     createDatabase: async () => {},
     dropDatabase: async () => {},
-    backupAndRestore: async (_cfg, source, target) => `/tmp/sstr_${source}_${target}.bak`,
+    backupAndRestore: async (_cfg, source, target) =>
+      `/tmp/sstr_${source}_${target}.bak`,
     listSstDatabases: async () => [],
     listStoredProcedures: async () => globalThis.__testProcedures ?? [],
     executeTestProcedure: async (_cfg, _db, fullName) => {
@@ -200,12 +203,16 @@ describe("run", () => {
     const cfg = baseConfig({ testDb: "sstr_runner_skip" });
     const reporter = await run(cfg, { cwd: root });
 
-    const skipped = reporter.results.find((r) => r.procedure === "dbo.test_skipped");
+    const skipped = reporter.results.find(
+      (r) => r.procedure === "dbo.test_skipped",
+    );
     assert.ok(skipped);
     assert.equal(skipped.skipped, true);
     assert.equal(skipped.passed, true);
 
-    const passed = reporter.results.find((r) => r.procedure === "dbo.test_pass");
+    const passed = reporter.results.find(
+      (r) => r.procedure === "dbo.test_pass",
+    );
     assert.ok(passed);
     assert.equal(passed.skipped, false);
     assert.equal(passed.passed, true);
@@ -275,7 +282,11 @@ describe("run", () => {
 
   test("bail stops after the first failure", async () => {
     await resetRoot();
-    globalThis.__testProcedures = ["dbo.test_fail", "dbo.test_pass", "dbo.test_pass2"];
+    globalThis.__testProcedures = [
+      "dbo.test_fail",
+      "dbo.test_pass",
+      "dbo.test_pass2",
+    ];
     await writeTestFile("sum.test.sql", "select 1");
 
     const cfg = baseConfig({ testDb: "sstr_runner_bail" });
@@ -307,7 +318,10 @@ describe("run", () => {
     await writeFile(join(root, "sum.test.json"), "{ invalid", "utf-8");
 
     const cfg = baseConfig({ testDb: "sstr_runner_invalidjson" });
-    await assert.rejects(() => run(cfg, { cwd: root }), /Invalid JSON in ".*sum\.test\.json"/);
+    await assert.rejects(
+      () => run(cfg, { cwd: root }),
+      /Invalid JSON in ".*sum\.test\.json"/,
+    );
   });
 
   test("uses testSchema to include non-prefixed procedures", async () => {
