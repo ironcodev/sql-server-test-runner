@@ -240,21 +240,29 @@ export async function cmdOptions(opts) {
 const OPTIONS_HELP = `
 Per-test options
 
-Put a JSON file next to each test file to customize how sstr runs its tests.
-The JSON file name is the test file name with ".sql" replaced by ".json"
-(e.g. "sum.test.sql" -> "sum.test.json").
+Two files control test behavior:
 
-To bootstrap the file:
+1. tests/sstr.json        - file-level options
+2. tests/<name>.test.json - per-SP options (flat object)
 
-  sstr options > tests/sum.test.json
-
-Structure:
+tests/sstr.json:
 
   {
-    "options": { ... },             # applies to all tests in the file
-    "tests": {
-      "<procedure_name>": { ... }   # applies to one test (bare name, no schema)
+    "files": {
+      "sum": { "skip": true, "logExecution": true },
+      "users.test": { "skip": true },
+      "procedures/phase1/sum": { "timeout": 60 }
     }
+  }
+
+  Keys are matched against the basename (with or without .test) or the
+  path relative to tests/. More specific keys override less specific ones.
+
+tests/sum.test.json:
+
+  {
+    "test_sum_should_return_sum": { "timeout": 30 },
+    "test_sum_should_return_zero": { "skip": true }
   }
 
 Available options:
@@ -286,10 +294,10 @@ Priority (low to high):
 
   1. sstr defaults
   2. defaultTestOptions in sstr.config.json
-  3. "options" in the JSON file (applies to all tests in the file)
-  4. "tests.<procedureName>" in the JSON file (applies to one test)
-  5. CLI switches (e.g. --no-transaction overrides transaction for all tests)
-
+  3. files.<name> in tests/sstr.json
+  4. <procName> in tests/sum.test.json
+  5. CLI switches (e.g. --no-transaction)
+  
 See also:
   sstr options           Print a sample JSON file (for redirect)
   sstr help              Print the general help

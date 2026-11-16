@@ -15,6 +15,8 @@ import {
 import { discoverTestFiles } from "./discover.js";
 import { createReporter } from "./reporter.js";
 import {
+  loadProjectOptions,
+  getFileOptions,
   loadTestOptions,
   resolveOptions,
   toBool,
@@ -34,10 +36,6 @@ function resolvePath(cwd, p) {
   return isAbsolute(p) ? p : join(cwd, p);
 }
 
-/**
- * Extracts the SQL Server error number from sqlcmd output.
- * Example: "Msg 8134, Level 16, State 1, ..." -> 8134
- */
 function extractSqlErrorNumber(text) {
   if (!text) return null;
   const match = text.match(/Msg\s+(\d+)/i);
@@ -50,7 +48,6 @@ async function runScriptOnDb(
   scriptPath,
   { assertSchema, debug, testSuite } = {},
 ) {
-  // Read the original script.
   let scriptText;
   try {
     scriptText = await readTextFile(scriptPath);
@@ -58,15 +55,9 @@ async function runScriptOnDb(
     throw new Error(`Failed to read "${scriptPath}": ${e.message}`);
   }
 
-  // Prepend :setvar directives so sqlcmd resolves $(AssertSchema) and
-  // $(TestSuite) without relying on -v (which mishandles Windows paths).
   const lines = [];
-  if (assertSchema) {
-    lines.push(`:setvar AssertSchema "${assertSchema}"`);
-  }
-  if (testSuite) {
-    lines.push(`:setvar TestSuite "${testSuite}"`);
-  }
+  if (assertSchema) lines.push(`:setvar AssertSchema "${assertSchema}"`);
+  if (testSuite) lines.push(`:setvar TestSuite "${testSuite}"`);
   lines.push("");
   lines.push(scriptText);
 
@@ -96,9 +87,7 @@ async function runScriptTextOnDb(
   { assertSchema, debug } = {},
 ) {
   const lines = [];
-  if (assertSchema) {
-    lines.push(`:setvar AssertSchema "${assertSchema}"`);
-  }
+  if (assertSchema) lines.push(`:setvar AssertSchema "${assertSchema}"`);
   lines.push("");
   lines.push(scriptText);
 
@@ -154,11 +143,10 @@ export async function run(
 ) {
   const startedAt = new Date();
   const startMs = nowMs();
+
   const assertSchema = cfg.assertSchema || DEFAULT_ASSERT_SCHEMA;
   const testMatch = new RegExp(cfg.testMatch || DEFAULT_TEST_MATCH, "i");
 
-  // testSchema may be a single schema name or a comma-separated list.
-  // Always include the "sstr" schema created by the assertion script.
   const testSchemas = new Set(
     (cfg.testSchema || "")
       .split(",")
@@ -168,30 +156,21 @@ export async function run(
   testSchemas.add("sstr");
 
   const configDefaults = cfg.defaultTestOptions || {};
-
-  // CLI --no-transaction overrides `transaction` for every test.
   const cliOverrides = useTransaction === false ? { transaction: false } : {};
 
   const reporter = createReporter(reportType, { color });
   const debug = detailed === true;
 
-  // For JSON/JUnit reporters, keep stdout clean; route progress to stderr.
   const progressLogger = {
     log: (...a) => {
       if (debug) {
-        if (reportType === "console") {
-          logger.log(...a);
-        } else {
-          console.error(...a);
-        }
+        if (reportType === "console") logger.log(...a);
+        else console.error(...a);
       }
     },
     error: (...a) => {
-      if (reportType === "console") {
-        logger.error(...a);
-      } else {
-        console.error(...a);
-      }
+      if (reportType === "console") logger.error(...a);
+      else console.error(...a);
     },
   };
 
@@ -253,6 +232,12 @@ export async function run(
 
     const scripts = cfg.scripts || {};
 
+    // Project-level options (tests/sstr.json)
+    const projectOptions = await loadProjectOptions(cwd);
+    for (const w of projectOptions.warnings) {
+      progressLogger.error(`[sstr] Warning: ${w}`);
+    }
+
     if (scripts.warmUp) {
       const warmUpPath = resolvePath(cwd, scripts.warmUp);
       progressLogger.log(`Running warmUp: ${warmUpPath}`);
@@ -271,9 +256,8 @@ export async function run(
     for (const file of files) {
       if (bailed) break;
 
-      // Load per-file options (JSON next to the .sql file).
+      // Load per-file JSON (per-SP settings).
       let optionsBundle;
-
       try {
         optionsBundle = await loadTestOptions(file);
       } catch (e) {
@@ -283,13 +267,16 @@ export async function run(
         progressLogger.error(`[sstr] Warning: ${w}`);
       }
 
-      if (toBool(optionsBundle.options.skip, false)) {
+      // File-level options from tests/sstr.json.
+      const fileLevelOptions = getFileOptions(projectOptions, file);
+
+      // Skip the whole file if requested at the file level.
+      if (toBool(fileLevelOptions.skip, false)) {
         initLogger(`  - ${file}  (skipped)`);
         continue;
       }
 
-      // Now announce that we are running this file.
-      progressLogger.log(`  ${file}`);
+      initLogger(`  ${file} ...`);
 
       if (scripts.preScript) {
         const p = resolvePath(cwd, scripts.preScript);
@@ -335,7 +322,7 @@ export async function run(
 
           const effective = resolveOptions({
             configDefaults,
-            fileOptions: optionsBundle.options,
+            fileOptions: fileLevelOptions,
             testOptions: testOpts,
             cliOverrides,
           });
@@ -397,12 +384,9 @@ export async function run(
           const succeeded = execRes.code === 0;
           const stderr = (execRes.stderr || "").trim();
           const stdout = (execRes.stdout || "").trim();
-          // Remove the assertion marker from stdout.
           const cleanStdout = stdout.replace(/SSTR_ASSERTION\s*/g, "").trim();
           const errorText = stderr || cleanStdout;
-          const hasAssertion = (execRes.stdout || "").includes(
-            "SSTR_ASSERTION",
-          );
+          const hasAssertion = stdout.includes("SSTR_ASSERTION");
 
           let passed;
           let resultError = null;
@@ -422,13 +406,13 @@ export async function run(
               if (succeeded) {
                 resultError = `Expected error ${expectedThrow}, but the test succeeded.`;
               } else if (errorNumber !== expectedThrow) {
-                resultError = `Expected error ${expectedThrow}, got ${errorNumber ?? "unknown"}.\n${errorText}`;
+                resultError = `Expected error ${expectedThrow}, got ${
+                  errorNumber ?? "unknown"
+                }.\n${errorText}`;
               }
             }
           }
 
-          // Warn when a test passed without calling any assertion.
-          // This catches "empty tests" that only execute a procedure but verify nothing.
           let warning = null;
           if (passed && !hasAssertion && expectedThrow === false) {
             warning =
@@ -444,7 +428,6 @@ export async function run(
             durationMs: logExec ? t2 : null,
             warning,
           });
-
           testedProcedures.add(full);
 
           if (!passed && bail) {
@@ -467,6 +450,7 @@ export async function run(
         }
       }
 
+      // One-line summary for this file.
       const fileResults = reporter.results.filter((r) => r.file === file);
       const pass = fileResults.filter((r) => r.passed && !r.skipped).length;
       const fail = fileResults.filter((r) => !r.passed && !r.skipped).length;
@@ -478,7 +462,6 @@ export async function run(
       } else if (fileResults.length === 0) {
         summary = `  - ${file}  (no test procedures found)`;
       } else if (pass === 0 && skipped > 0) {
-        // All tests were skipped.
         summary = `  - ${file}  (${skipped} skipped)`;
       } else {
         summary = `  + ${file}  (${pass} pass, ${fail} fail${skipped ? `, ${skipped} skipped` : ""})`;
@@ -500,10 +483,8 @@ export async function run(
 
     const finishedAt = new Date();
     const durationMs = nowMs() - startMs;
-
     reporter.setRunInfo({ startedAt, finishedAt, durationMs });
     reporter.print();
-
     return reporter;
   } finally {
     if (!keepDb) {
@@ -526,7 +507,7 @@ export async function run(
         }
       }
     } else {
-      progressLogger.log(`Keeping test database "${targetDb}" (--keep-db).`);
+      initLogger(`Keeping test database "${targetDb}" (--keep-db).`);
     }
   }
 }

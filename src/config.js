@@ -1,7 +1,7 @@
 import { access } from "fs/promises";
 import { join, isAbsolute } from "path";
 import { constants } from "fs";
-import { readTextFile } from "./file-utils";
+import { readTextFile } from "./file-utils.js";
 
 const BASE_CONFIG = "sstr.config.json";
 

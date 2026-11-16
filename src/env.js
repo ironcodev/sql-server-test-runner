@@ -1,7 +1,7 @@
 import { access } from "fs/promises";
 import { join } from "path";
 import { constants } from "fs";
-import { readTextFile } from "./file-utils";
+import { readTextFile } from "./file-utils.js";
 
 async function fileExists(path) {
   try {

@@ -91,88 +91,62 @@ If you want tests to run against a schema that already exists (your real schema)
 
 ## Per-test options
 
-Put a JSON file next to each test file to customize how `sstr` runs its tests:
+You have two places to configure tests:
 
-\`\`\`text
-tests/
-├── sum.test.sql
-├── sum.test.json
-└── users.test.sql
-\`\`\`
+- **`tests/sstr.json`** — file-level options, applied to every test in a file.
+- **`tests/sum.test.json`** — per-SP options, applied to a single procedure.
 
-\`sum.test.json\`:
+### File-level options (`tests/sstr.json`)
 
-\`\`\`json
+```json
 {
-  "options": {
-    "transaction": false,
-    "logExecution": true
-  },
-  "tests": {
-    "test_sum_should_return_sum_of_values": {
-      "transaction": true
-    },
-    "test_sum_should_return_zero_for_null_values": {
-      "skip": true
-    }
+  "files": {
+    "sum": { "skip": true, "logExecution": true },
+    "users.test": { "skip": true },
+    "procedures/phase1/sum": { "timeout": 60 }
   }
 }
-\`\`\`
-
-The JSON file name is the test file name with `.sql` replaced by `.json`.
-
-To bootstrap the JSON file, run `sstr options` and copy the output next to
-your test file:
-```bash
-sstr options > tests/my_test.json
 ```
 
-Then, modify options based on your needs.
+Keys are matched against each test file's basename (with or without `.test`)
+or its path relative to `tests/`. A key like `sum` applies to every
+`sum.test.sql` in the tree; `procedures/phase1/sum` applies only to that
+one file.
 
-For a full reference at the terminal:
-```bash
-sstr help options
+### Per-SP options (`tests/sum.test.json`)
+
+```json
+{
+  "test_sum_should_return_sum": { "timeout": 30 },
+  "test_sum_should_return_zero": { "skip": true }
+}
 ```
 
-### Options
+### Available options
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| \`transaction\` | boolean | \`true\` | Wrap the test in a transaction and roll it back. Set to \`false\` for tests that commit internally. |
-| \`logExecution\` | boolean | \`false\` | Measure and report the execution time of this test. |
-| \`skip\` | boolean | \`false\` | Skip this test. It is reported as skipped. |
-| \`timeout\` | number | \`null\` | Query timeout in seconds for this test. Overrides \`queryTimeout\` from the config. |
-| \`preScript\` | string | \`null\` | Path to a \`.sql\` file that runs before this test. |
-| \`postScript\` | string | \`null\` | Path to a \`.sql\` file that runs after this test. |
-| \`throws\` | boolean or number | \`false\` | If \`true\`, the test must fail with any error. If a number, the test must fail with that SQL Server error number. |
+| `transaction` | boolean | `true` | Wrap the test in a transaction and roll it back. |
+| `logExecution` | boolean | `false` | Measure and report the execution time. |
+| `skip` | boolean | `false` | Skip the test. |
+| `timeout` | number | `null` | Query timeout in seconds for this test. |
+| `preScript` | string | `null` | Path to a `.sql` file that runs before this test. |
+| `postScript` | string | `null` | Path to a `.sql` file that runs after this test. |
+| `throws` | boolean or number | `false` | Require the test to fail (any error, or a specific SQL Server error number). |
 
 ### Resolution order
 
-Priority (low to high):
-
-1. \`sstr\` defaults.
-2. \`defaultTestOptions\` in \`sstr.config.json\`.
-3. \`options\` in the JSON file (applies to all tests in the file).
-4. \`tests.<procedureName>\` in the JSON file (applies to one test).
-5. CLI switches (e.g. \`--no-transaction\` overrides \`transaction\` for all tests).
-
-Test names in \`tests\` are matched against the **bare procedure name** (without schema), case-insensitively.
+1. `sstr` defaults
+2. `defaultTestOptions` in `sstr.config.json`
+3. `files.<name>` in `tests/sstr.json`
+4. `<procName>` in `tests/sum.test.json`
+5. CLI switches (e.g. `--no-transaction`)
 
 ### Errors and warnings
 
-- If the JSON file exists but is invalid, \`sstr\` aborts with:
-  \`\`\`text
-  Invalid JSON in "tests/sum.test.json": Unexpected token } at position 42
-  \`\`\`
-- If the JSON file contains an unknown key, \`sstr\` prints a warning and continues:
-  \`\`\`text
-  [sstr] Warning: Unknown option "timer" in "options" of "tests/sum.test.json". Allowed: transaction, logExecution, skip, timeout, preScript, postScript, throws.
-  \`\`\`
-- If the JSON file does not exist, defaults are used.
-
-### \`$(TestSuite)\`
-
-\`sstr\` still passes \`$(TestSuite)\` (the test file path) to \`sqlcmd\`, so you can use it inside test scripts if needed.
+- Invalid JSON aborts the run.
+- Unknown keys produce a warning.
+- `options` or `tests` in a per-file JSON produces a warning and is ignored.
 
 ## Multiple assertions per test
 

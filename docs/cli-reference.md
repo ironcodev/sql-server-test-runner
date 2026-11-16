@@ -119,15 +119,23 @@ In non-TTY environments, `sstr clean` aborts unless `--yes` is given.
 
 ### `sstr options`
 
-Prints a sample per-test options JSON file. Redirect it next to a test file,
-then edit as needed.
+Prints a sample per-SP options JSON file. Redirect it next to a test file:
 
 ```bash
-sstr options > tests/my_test.json
+sstr options > tests/sum.test.json
 ```
 
-The sample contains all supported options. See
-[Writing Tests](https://github.com/ironcodev/sql-server-test-runner/blob/main/docs/writing-tests.md) for the full reference,
+For file-level options, create `tests/sstr.json` manually:
+
+```json
+{
+  "files": {
+    "sum": { "skip": true }
+  }
+}
+```
+
+See [Writing Tests](https://github.com/ironcodev/sql-server-test-runner/blob/main/docs/writing-tests.md) for the full reference,
 or run `sstr help options`.
 
 ### `sstr help options`

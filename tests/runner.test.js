@@ -196,9 +196,7 @@ describe("run", () => {
     await resetRoot();
     globalThis.__testProcedures = ["dbo.test_pass", "dbo.test_skipped"];
     await writeTestFile("sum.test.sql", "select 1");
-    await writeOptionsFile("sum.test.sql", {
-      tests: { test_skipped: { skip: true } },
-    });
+    await writeOptionsFile("sum.test.sql", { test_skipped: { skip: true } });
 
     const cfg = baseConfig({ testDb: "sstr_runner_skip" });
     const reporter = await run(cfg, { cwd: root });
@@ -222,9 +220,7 @@ describe("run", () => {
     await resetRoot();
     globalThis.__testProcedures = ["dbo.test_fail"];
     await writeTestFile("sum.test.sql", "select 1");
-    await writeOptionsFile("sum.test.sql", {
-      tests: { test_fail: { throws: true } },
-    });
+    await writeOptionsFile("sum.test.sql", { test_fail: { throws: true } });
 
     const cfg = baseConfig({ testDb: "sstr_runner_throws_true" });
     const reporter = await run(cfg, { cwd: root });
@@ -237,9 +233,7 @@ describe("run", () => {
     await resetRoot();
     globalThis.__testProcedures = ["dbo.test_pass"];
     await writeTestFile("sum.test.sql", "select 1");
-    await writeOptionsFile("sum.test.sql", {
-      tests: { test_pass: { throws: true } },
-    });
+    await writeOptionsFile("sum.test.sql", { test_pass: { throws: true } });
 
     const cfg = baseConfig({ testDb: "sstr_runner_throws_true_fail" });
     const reporter = await run(cfg, { cwd: root });
@@ -254,7 +248,7 @@ describe("run", () => {
     globalThis.__testProcedures = ["dbo.test_throw_8134"];
     await writeTestFile("sum.test.sql", "select 1");
     await writeOptionsFile("sum.test.sql", {
-      tests: { test_throw_8134: { throws: 8134 } },
+      test_throw_8134: { throws: 8134 },
     });
 
     const cfg = baseConfig({ testDb: "sstr_runner_throws_num" });
@@ -269,7 +263,7 @@ describe("run", () => {
     globalThis.__testProcedures = ["dbo.test_throw_8134"];
     await writeTestFile("sum.test.sql", "select 1");
     await writeOptionsFile("sum.test.sql", {
-      tests: { test_throw_8134: { throws: 50000 } },
+      test_throw_8134: { throws: 50000 },
     });
 
     const cfg = baseConfig({ testDb: "sstr_runner_throws_num_fail" });
@@ -300,7 +294,9 @@ describe("run", () => {
     await resetRoot();
     globalThis.__testProcedures = ["dbo.test_pass"];
     await writeTestFile("sum.test.sql", "select 1");
-    await writeOptionsFile("sum.test.sql", { options: { timer: 10 } });
+    await writeOptionsFile("sum.test.sql", {
+      test_pass: { timer: 10 },
+    });
 
     const errors = [];
     const fakeLogger = { log: () => {}, error: (m) => errors.push(m) };
@@ -369,7 +365,7 @@ describe("run", () => {
     globalThis.__testProcedures = ["dbo.test_pass"];
     await writeTestFile("sum.test.sql", "select 1");
     await writeOptionsFile("sum.test.sql", {
-      tests: { test_pass: { logExecution: true } },
+      test_pass: { logExecution: true },
     });
 
     const cfg = baseConfig({ testDb: "sstr_runner_logtime" });

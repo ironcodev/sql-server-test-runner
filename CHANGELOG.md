@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0] - 2026-11-16
 
+### Added
+
+- **Project-level test options** in `tests/sstr.json`. File-level options
+  (`skip`, `logExecution`, `transaction`, `timeout`, `preScript`,
+  `postScript`, `throws`) can now be set once for many files. Keys match
+  the basename (with or without `.test`) or the path relative to `tests/`.
+- `src/file-utils.js` with `readTextFile`, supporting UTF-8 (with or without
+  BOM) and UTF-16 LE/BE (with BOM).
+- Report header now shows the start time, end time, and total duration.
+- `SSTR_SQLCMD_PATH` environment variable and `.env.sstr` file support.
+
+### Changed
+
+- **Breaking:** per-file JSON (`tests/sum.test.json`) no longer supports
+  `options` or `tests`. It is now a flat object keyed by procedure name.
+  File-level options moved to `tests/sstr.json`. If `options` or `tests`
+  is present, it is ignored with a warning.
+- `sstr options` now prints a per-SP sample. File-level options are
+  documented in `sstr help options`.
+
+### Fixed
+
+- UTF-16 BE/LE and UTF-8 BOM files are now read correctly.
+- Skipped files are reported as `SKIP`, not `PASS`.
+- `sqlcmd` resolution on Windows no longer relies on `shell: true`.
+
 ### Removed
 
 - **Breaking:** removed the following assertion procedures from `sstr`.

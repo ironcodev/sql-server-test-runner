@@ -118,6 +118,63 @@ All optional. Each key maps to a `sqlcmd` switch.
 | `fixedLengthTypeDisplayWidth` | `-Y` | Display width for fixed-length types. |
 | `performanceStatistics` | `-p1` | Print performance statistics. |
 
+### Project-level test options (`tests/sstr.json`)
+
+File-level test settings live in `tests/sstr.json`:
+
+```json
+{
+  "files": {
+    "sum": { "skip": true, "logExecution": true },
+    "users.test": { "skip": true },
+    "procedures/phase1/sum": { "timeout": 60 },
+    "./procedures/phase2/orders.test": { "transaction": false }
+  }
+}
+```
+
+Keys under `files` are matched against each test file as follows:
+
+- **Without a path** (`sum`, `users.test`): matched against the basename of
+  the test file, with or without the `.test` suffix and without `.sql`.
+  A key like `sum` applies to every `sum.test.sql` in the tree.
+- **With a path** (`procedures/phase1/sum`): matched against the test file's
+  path relative to `tests/`, without `.sql`. Applies only to that one file.
+
+More specific keys override less specific ones:
+
+```text
+procedures/phase1/sum  >  sum.test  >  sum
+```
+
+If several keys match, their options are merged with this priority.
+
+### Per-SP options (`tests/sum.test.json`)
+
+The JSON file next to a test file contains **only per-SP settings**. It is a
+flat object keyed by procedure name:
+
+```json
+{
+  "test_sum_should_return_sum": { "timeout": 30 },
+  "test_sum_should_return_zero": { "skip": true }
+}
+```
+
+> `options` and `tests` are no longer supported in this file. File-level
+> options live in `tests/sstr.json`. If `options` or `tests` is present, it
+> is ignored with a warning.
+
+### Resolution order
+
+Priority (low to high):
+
+1. `sstr` defaults
+2. `defaultTestOptions` in `sstr.config.json`
+3. `files.<name>` in `tests/sstr.json`
+4. `<procName>` in `tests/sum.test.json`
+5. CLI switches (e.g. `--no-transaction`)
+
 ## Example: base + env
 
 `sstr.config.json`:

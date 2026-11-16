@@ -2,7 +2,7 @@ import { spawn } from "child_process";
 import { readdir, access } from "fs/promises";
 import { join } from "path";
 import { constants } from "fs";
-import { readTextFile } from "../src/file-utils";
+import { readTextFile } from "../src/file-utils.js";
 
 const ENV_FILE = ".env.integration";
 

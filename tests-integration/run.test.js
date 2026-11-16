@@ -147,7 +147,7 @@ describe("integration: run", { skip: !enabled }, () => {
     );
     await writeFile(
       join(root, "sum.test.json"),
-      JSON.stringify({ tests: { test_should_be_skipped: { skip: true } } }),
+      JSON.stringify({ test_should_be_skipped: { skip: true } }),
       "utf-8",
     );
 
@@ -176,7 +176,7 @@ describe("integration: run", { skip: !enabled }, () => {
     );
     await writeFile(
       join(root, "sum.test.json"),
-      JSON.stringify({ tests: { test_should_fail: { throws: true } } }),
+      JSON.stringify({ test_should_fail: { throws: true } }),
       "utf-8",
     );
 
@@ -204,7 +204,7 @@ describe("integration: run", { skip: !enabled }, () => {
     );
     await writeFile(
       join(root, "sum.test.json"),
-      JSON.stringify({ tests: { test_throws_50000: { throws: 50000 } } }),
+      JSON.stringify({ test_throws_50000: { throws: 50000 } }),
       "utf-8",
     );
 
@@ -256,7 +256,7 @@ describe("integration: run", { skip: !enabled }, () => {
     );
     await writeFile(
       join(root, "sum.test.json"),
-      JSON.stringify({ tests: { test_with_time: { logExecution: true } } }),
+      JSON.stringify({ test_with_time: { logExecution: true } }),
       "utf-8",
     );
 

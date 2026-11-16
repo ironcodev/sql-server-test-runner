@@ -1,7 +1,3 @@
-// ============================================================
-// Color helpers
-// ============================================================
-
 const COLORS = {
   reset: "\x1b[0m",
   red: "\x1b[31m",
@@ -16,10 +12,6 @@ function makeColorizer(enabled) {
   if (!enabled) return () => (s) => s;
   return (color, s) => `${COLORS[color] || ""}${s}${COLORS.reset}`;
 }
-
-// ============================================================
-// Base reporter
-// ============================================================
 
 class BaseReporter {
   constructor({ color = true } = {}) {
@@ -71,10 +63,6 @@ class BaseReporter {
   }
 }
 
-// ============================================================
-// Console reporter
-// ============================================================
-
 export class ConsoleReporter extends BaseReporter {
   print() {
     const c = this.c;
@@ -87,7 +75,7 @@ export class ConsoleReporter extends BaseReporter {
       const started = this.runInfo.startedAt.toLocaleString();
       const finished = this.runInfo.finishedAt.toLocaleString();
       const seconds = (this.runInfo.durationMs / 1000).toFixed(2);
-      console.log(``);
+      console.log("");
       console.log(`Started:  ${started}`);
       console.log(`Finished: ${finished}`);
       console.log(`Duration: ${seconds}s`);
@@ -119,10 +107,11 @@ export class ConsoleReporter extends BaseReporter {
               : c("gray", "EMPTY");
       console.log(`  - ${f} [${badge}]`);
       console.log(
-        `      procedures: ${list.length}, pass: ${pass}, fail: ${fail}${skipped ? `, skipped: ${skipped}` : ""}`,
+        `      procedures: ${list.length}, pass: ${pass}, fail: ${fail}${
+          skipped ? `, skipped: ${skipped}` : ""
+        }`,
       );
 
-      // Execution times (only for tests that enabled logExecution).
       const withTime = list.filter((r) => r.durationMs != null);
       if (withTime.length > 0) {
         console.log("      execution times:");
@@ -130,12 +119,10 @@ export class ConsoleReporter extends BaseReporter {
         const width = Math.max(...labels.map((s) => s.length));
         for (let i = 0; i < withTime.length; i++) {
           const r = withTime[i];
-          const label = labels[i].padStart(width);
-          console.log(`        ${label}  ${r.procedure}`);
+          console.log(`        ${labels[i].padStart(width)}  ${r.procedure}`);
         }
       }
 
-      // Warnings (e.g. test passed without calling any assertion).
       const warned = list.filter((r) => r.warning);
       if (warned.length > 0) {
         console.log(c("yellow", "      warnings:"));
@@ -186,7 +173,6 @@ export class ConsoleReporter extends BaseReporter {
       `Total: ${total}, ${passLabel}, ${failLabel}${skipLabel}${warnLabel}`,
     );
 
-    // Total execution time (only for tests that enabled logExecution).
     const withTime = this.results.filter((r) => r.durationMs != null);
     if (withTime.length > 0) {
       const totalMs = withTime.reduce((sum, r) => sum + r.durationMs, 0);
@@ -198,10 +184,6 @@ export class ConsoleReporter extends BaseReporter {
     console.log(c("cyan", "=============================================="));
   }
 }
-
-// ============================================================
-// JSON reporter
-// ============================================================
 
 export class JsonReporter extends BaseReporter {
   print() {
@@ -238,10 +220,6 @@ export class JsonReporter extends BaseReporter {
   }
 }
 
-// ============================================================
-// JUnit reporter
-// ============================================================
-
 function escapeXml(s) {
   return String(s)
     .replace(/&/g, "&amp;")
@@ -258,9 +236,11 @@ export class JUnitReporter extends BaseReporter {
     const skipped = this.results.filter((r) => r.skipped).length;
     const withTime = this.results.filter((r) => r.durationMs != null);
     const totalMs = withTime.reduce((sum, r) => sum + r.durationMs, 0);
+
     const timestamp = this.runInfo
       ? this.runInfo.startedAt.toISOString().replace(/\.\d+Z$/, "")
       : "";
+
     const lines = [];
     lines.push('<?xml version="1.0" encoding="UTF-8"?>');
     lines.push(
@@ -308,10 +288,6 @@ export class JUnitReporter extends BaseReporter {
     process.stdout.write(lines.join("\n") + "\n");
   }
 }
-
-// ============================================================
-// Factory
-// ============================================================
 
 export function createReporter(type, { color = true } = {}) {
   if (type === "json") return new JsonReporter({ color: false });

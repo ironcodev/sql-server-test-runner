@@ -1,6 +1,7 @@
 import { access } from "fs/promises";
 import { constants } from "fs";
-import { readTextFile } from "./file-utils";
+import { join, relative } from "path";
+import { readTextFile } from "./file-utils.js";
 
 /**
  * Default options applied to every test when nothing else is specified.
@@ -28,6 +29,8 @@ export const KNOWN_OPTIONS = new Set([
   "throws",
 ]);
 
+const DEFAULT_PROJECT_OPTIONS_FILE = "tests/sstr.json";
+
 async function fileExists(path) {
   try {
     await access(path, constants.F_OK);
@@ -38,25 +41,134 @@ async function fileExists(path) {
 }
 
 /**
- * Loads the per-file options JSON next to a test file.
+ * Normalizes a path to use forward slashes and removes a leading "./".
+ */
+function normalizePath(p) {
+  return String(p).replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+/**
+ * Returns candidate keys for a test file, from most specific to least:
+ *   1. relative path from tests/ dir, without .sql (e.g. "procedures/phase1/sum")
+ *   2. basename without .sql (e.g. "sum.test")
+ *   3. basename without .sql and .test (e.g. "sum")
+ */
+function fileKeys(testFilePath, testsDir) {
+  const rel = normalizePath(relative(testsDir, testFilePath));
+  const noSql = rel.replace(/\.sql$/i, "");
+  const basename = noSql.split("/").pop();
+  const noTestBasename = basename.replace(/\.test$/i, "");
+  const dir = noSql.includes("/") ? noSql.slice(0, noSql.lastIndexOf("/")) : "";
+  const noTestPath = dir ? `${dir}/${noTestBasename}` : noTestBasename;
+
+  const keys = new Set();
+  keys.add(noSql); // procedures/phase1/sum.test
+  keys.add(noTestPath); // procedures/phase1/sum
+  keys.add(basename); // sum.test
+  keys.add(noTestBasename); // sum
+  return [...keys];
+}
+
+/**
+ * Loads the project-level options file (tests/sstr.json by default).
+ * Returns { files: Map<normalizedKey, options>, warnings, path, testsDir }.
  *
- * The JSON file name is the test file name with `.sql` replaced by `.json`
- * (e.g. `sum.test.sql` -> `sum.test.json`).
+ * The file structure is:
+ *   { "files": { "sum": { "skip": true }, "procedures/phase1/sum": { ... } } }
+ */
+export async function loadProjectOptions(
+  cwd,
+  optionsFilePath = DEFAULT_PROJECT_OPTIONS_FILE,
+) {
+  const fullPath = join(cwd, optionsFilePath);
+  const testsDir = join(cwd, "tests");
+
+  if (!(await fileExists(fullPath))) {
+    return { files: new Map(), warnings: [], path: fullPath, testsDir };
+  }
+
+  const raw = await readTextFile(fullPath);
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (e) {
+    throw new Error(`Invalid JSON in "${fullPath}": ${e.message}`);
+  }
+
+  const warnings = [];
+  const filesRaw = parsed.files ?? {};
+  if (typeof filesRaw !== "object" || Array.isArray(filesRaw)) {
+    throw new Error(
+      `Invalid JSON in "${fullPath}": "files" must be an object.`,
+    );
+  }
+
+  const files = new Map();
+  for (const [name, opts] of Object.entries(filesRaw)) {
+    if (opts === null || typeof opts !== "object" || Array.isArray(opts)) {
+      throw new Error(
+        `Invalid JSON in "${fullPath}": "files.${name}" must be an object.`,
+      );
+    }
+    for (const key of Object.keys(opts)) {
+      if (!KNOWN_OPTIONS.has(key)) {
+        warnings.push(
+          `Unknown option "${key}" for file "${name}" in "${fullPath}". ` +
+            `Allowed: ${[...KNOWN_OPTIONS].join(", ")}.`,
+        );
+      }
+    }
+    files.set(normalizePath(name), opts);
+  }
+
+  return { files, warnings, path: fullPath, testsDir };
+}
+
+/**
+ * Returns the merged file-level options for a test file.
+ * Later (more specific) matches override earlier ones:
+ *   1. name without .test (least specific)
+ *   2. basename with .test
+ *   3. relative path (most specific)
+ */
+export function getFileOptions(projectOptions, testFilePath) {
+  if (!projectOptions || projectOptions.files.size === 0) return {};
+
+  const keys = fileKeys(testFilePath, projectOptions.testsDir);
+  // keys: [noSqlPath, noTestPath, basename, noTestBasename]
+  // Apply from least to most specific:
+  const ordered = [
+    keys[3], // noTestBasename (sum)
+    keys[2], // basename (sum.test)
+    keys[1], // noTestPath (procedures/phase1/sum)
+    keys[0], // noSqlPath (procedures/phase1/sum.test)
+  ];
+
+  let merged = {};
+  for (const k of ordered) {
+    const opts = projectOptions.files.get(k);
+    if (opts) merged = { ...merged, ...opts };
+  }
+  return merged;
+}
+
+/**
+ * Loads the per-file JSON next to a test file.
  *
- * Returns { options, tests, warnings } where:
- *   - options:  file-level defaults for all tests
- *   - tests:    Map<lowercased procedure name, per-test overrides>
- *   - warnings: array of human-readable warning strings (unknown keys)
+ * The file is now a flat object keyed by procedure name:
+ *   { "test_foo": { "timeout": 30 }, "test_bar": { "skip": true } }
  *
- * Throws if the file exists but is not valid JSON.
- * Returns empty structures if the file does not exist.
+ * "options" and "tests" are no longer supported; if present, they are
+ * ignored with a warning so existing files do not break silently.
+ *
+ * Returns { tests: Map<lowercased proc name, options>, warnings, jsonPath }.
  */
 export async function loadTestOptions(testFilePath) {
   const jsonPath = testFilePath.replace(/\.sql$/i, ".json");
   const warnings = [];
 
   if (!(await fileExists(jsonPath))) {
-    return { options: {}, tests: new Map(), warnings, jsonPath };
+    return { tests: new Map(), warnings, jsonPath };
   }
 
   let raw;
@@ -74,32 +186,28 @@ export async function loadTestOptions(testFilePath) {
   }
 
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error(`Invalid JSON in "${jsonPath}": expected an object at the top level.`);
-  }
-
-  // File-level options.
-  const fileOptions = parsed.options ?? {};
-  if (typeof fileOptions !== "object" || Array.isArray(fileOptions)) {
-    throw new Error(`Invalid JSON in "${jsonPath}": "options" must be an object.`);
-  }
-  for (const key of Object.keys(fileOptions)) {
-    if (!KNOWN_OPTIONS.has(key)) {
-      warnings.push(
-        `Unknown option "${key}" in "options" of "${jsonPath}". ` + `Allowed: ${[...KNOWN_OPTIONS].join(", ")}.`,
-      );
-    }
-  }
-
-  // Per-test options.
-  const testsRaw = parsed.tests ?? {};
-  if (typeof testsRaw !== "object" || Array.isArray(testsRaw)) {
-    throw new Error(`Invalid JSON in "${jsonPath}": "tests" must be an object.`);
+    throw new Error(
+      `Invalid JSON in "${jsonPath}": expected an object at the top level.`,
+    );
   }
 
   const tests = new Map();
-  for (const [procName, procOpts] of Object.entries(testsRaw)) {
-    if (procOpts === null || typeof procOpts !== "object" || Array.isArray(procOpts)) {
-      throw new Error(`Invalid JSON in "${jsonPath}": "tests.${procName}" must be an object.`);
+  for (const [procName, procOpts] of Object.entries(parsed)) {
+    if (procName === "options" || procName === "tests") {
+      warnings.push(
+        `"${procName}" is not supported in "${jsonPath}". ` +
+          `Per-file options live in "tests/sstr.json"; put per-SP settings directly under the top-level object.`,
+      );
+      continue;
+    }
+    if (
+      procOpts === null ||
+      typeof procOpts !== "object" ||
+      Array.isArray(procOpts)
+    ) {
+      throw new Error(
+        `Invalid JSON in "${jsonPath}": "${procName}" must be an object.`,
+      );
     }
     for (const key of Object.keys(procOpts)) {
       if (!KNOWN_OPTIONS.has(key)) {
@@ -112,7 +220,7 @@ export async function loadTestOptions(testFilePath) {
     tests.set(procName.toLowerCase(), procOpts);
   }
 
-  return { options: fileOptions, tests, warnings, jsonPath };
+  return { tests, warnings, jsonPath };
 }
 
 /**
@@ -121,11 +229,16 @@ export async function loadTestOptions(testFilePath) {
  * Priority (low to high):
  *   1. DEFAULT_OPTIONS
  *   2. sstr.config defaultTestOptions
- *   3. file-level "options" in the JSON file
- *   4. per-test "tests.<name>" in the JSON file
+ *   3. file-level options (tests/sstr.json, matched by getFileOptions)
+ *   4. per-SP options (from the per-file JSON)
  *   5. CLI overrides (e.g. --no-transaction)
  */
-export function resolveOptions({ configDefaults = {}, fileOptions = {}, testOptions = {}, cliOverrides = {} } = {}) {
+export function resolveOptions({
+  configDefaults = {},
+  fileOptions = {},
+  testOptions = {},
+  cliOverrides = {},
+} = {}) {
   return {
     ...DEFAULT_OPTIONS,
     ...configDefaults,
