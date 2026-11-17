@@ -4,14 +4,14 @@
 
 ## Determining the test database
 
-The database name comes from `testDb` in the config. If not set, it defaults to `sst_testdb`.
+The database name comes from `testDb` in the config. If not set, it defaults to `sstr_testdb`.
 
 | Scenario | Behavior |
 |---|---|
-| `testDb` not set, `sst_testdb` does not exist | Creates `sst_testdb`, runs tests, drops it. |
-| `testDb` not set, `sst_testdb` exists | **Aborts with an error.** The default database must not pre-exist. |
+| `testDb` not set, `sstr_testdb` does not exist | Creates `sstr_testdb`, runs tests, drops it. |
+| `testDb` not set, `sstr_testdb` exists | **Aborts with an error.** The default database must not pre-exist. |
 | `testDb` set, database does not exist | Creates it, runs tests, drops it. |
-| `testDb` set, database exists | Backs it up, restores a copy as `{testDb}_sst_{random}`, runs tests against the copy, drops the copy. The original is untouched. |
+| `testDb` set, database exists | Backs it up, restores a copy as `{testDb}_sstr_{random}`, runs tests against the copy, drops the copy. The original is untouched. |
 
 Use `sstr clean` to remove leftover databases from crashed runs or `--keep-db`.
 
@@ -89,8 +89,8 @@ At the end of the run, `sstr` drops the target database (the created one or the 
 `sstr clean` removes:
 
 - `testDb` (if it exists),
-- restored copies matching `{testDb}_sst_*`,
-- `.bak` files named `sst_*.bak` in `backupPath` (unless `--keep-backups`).
+- restored copies matching `{testDb}_sstr_*`,
+- `.bak` files named `sstr_*.bak` in `backupPath` (unless `--keep-backups`).
 
 ## What `sstr` never touches
 

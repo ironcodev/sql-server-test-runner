@@ -343,10 +343,10 @@ export async function executeTestProcedure(
  * Returns the list of databases whose names start with `${prefix}_sstr_`.
  * Uses ESCAPE to treat underscores literally.
  */
-export async function listSstDatabases(
+export async function listSstrDatabases(
   cfg,
   prefix,
-  { debug = false, label = "listSstDatabases" } = {},
+  { debug = false, label = "listSstrDatabases" } = {},
 ) {
   const safe = prefix.replace(/'/g, "''").replace(/[_%]/g, (m) => `\\${m}`);
   const q = `

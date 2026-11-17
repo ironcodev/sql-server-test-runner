@@ -52,9 +52,9 @@ Creates a starter `sstr.config.json` in the current directory. Fails if the file
 
 The generated config sets `testSchema` to `"sstr"`. The assertion script creates the `sstr` schema in the test database, so you can put test procedures there without a `test_` prefix.
 
-\`\`\`bash
+```bash
 sstr init
-\`\`\`
+```
 
 ### `sstr list`
 
@@ -102,9 +102,9 @@ Exit codes: `0` connection succeeded, `1` connection failed or config invalid.
 
 Removes leftover artifacts from previous runs:
 
-- the test database (`testDb`, default `sst_testdb`) if it exists,
-- restored copies matching `{testDb}_sst_*`,
-- `.bak` files named `sst_*.bak` inside `backupPath` (unless `--keep-backups`).
+- the test database (`testDb`, default `sstr_testdb`) if it exists,
+- restored copies matching `{testDb}_sstr_*`,
+- `.bak` files named `sstr_*.bak` inside `backupPath` (unless `--keep-backups`).
 
 Never touches source databases, unrelated user databases, or files outside `backupPath`. The config file is never deleted.
 
@@ -217,7 +217,7 @@ Overrides `queryTimeout` from the config. Non-negative integer; passed to `sqlcm
 
 ### `-nt`, `--no-transaction`
 
-\`--no-transaction\` overrides the per-test \`transaction\` option for every test, including those set in per-file JSON files. Accepted by `run` only.
+`--no-transaction` overrides the per-test `transaction` option for every test, including those set in per-file JSON files. Accepted by `run` only.
 
 By default, each test procedure is executed inside a `BEGIN TRANSACTION` … `ROLLBACK` block, so any data changes it makes are discarded when the procedure finishes, and tests cannot leak state into each other. Use this flag only when a test procedure (or a procedure under test) issues its own `COMMIT`; in that case the wrapper cannot roll the changes back and the test would otherwise fail with a misleading error about a missing transaction.
 

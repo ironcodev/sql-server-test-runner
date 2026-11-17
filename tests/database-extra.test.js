@@ -13,7 +13,7 @@ const fakeRunSqlcmd = async (args) => {
     return { code: 0, stdout: "1", stderr: "" };
   }
   if (sql.includes("sys.databases")) {
-    // listSstDatabases
+    // listSstrDatabases
     return { code: 0, stdout: "db1\nsstr_db_sstr_1\ndb2", stderr: "" };
   }
   if (sql.includes("from sys.parameters")) {
@@ -54,7 +54,7 @@ const {
   databaseExists,
   createDatabase,
   dropDatabase,
-  listSstDatabases,
+  listSstrDatabases,
   listStoredProcedures,
   executeTestProcedure,
 } = await import("../src/database.js");
@@ -101,10 +101,10 @@ describe("dropDatabase", () => {
   });
 });
 
-describe("listSstDatabases", () => {
+describe("listSstrDatabases", () => {
   test("returns the list of matching database names", async () => {
     sqlcmdCalls.length = 0;
-    const list = await listSstDatabases(baseConfig(), "sstr_db");
+    const list = await listSstrDatabases(baseConfig(), "sstr_db");
     assert.ok(Array.isArray(list));
     // The mock returns three lines; only the ones matching the pattern
     // would normally be returned by SQL Server. We just check the shape.

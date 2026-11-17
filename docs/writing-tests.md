@@ -10,25 +10,25 @@ You have two options for telling `sstr` which procedures are tests.
 
 Procedures whose **bare name** matches `testMatch` (default `^test_`) are tests, regardless of their schema.
 
-\`\`\`sql
+```sql
 create or alter proc test_sum_should_return_sum_of_values ...
-\`\`\`
+```
 
 ### Option 2: put them in the `sstr` schema
 
 `sstr init` sets `testSchema` to `"sstr"`, and the assertion script creates that schema. Any procedure in the `sstr` schema is treated as a test, without needing a `test_` prefix.
 
-\`\`\`sql
+```sql
 create or alter proc sstr.sum_should_return_sum_of_values ...
-\`\`\`
+```
 
 You can list multiple schemas, separated by commas:
 
-\`\`\`json
+```json
 {
   "testSchema": "sstr, integration_tests"
 }
-\`\`\`
+```
 
 Procedures in `assertSchema` (default `Assert`) are always excluded.
 
@@ -82,10 +82,10 @@ If many tests share the same seed data, put it in a `preScript` or `warmUp` file
 
 ## Test database
 
-By default, `sstr` uses `sst_testdb`. If you set `testDb` in the config:
+By default, `sstr` uses `sstr_testdb`. If you set `testDb` in the config:
 
 - If `testDb` does not exist, `sstr` creates it, runs tests, then drops it.
-- If `testDb` exists, `sstr` backs it up, restores a copy as `{testDb}_sst_{random}`, runs tests against the copy, then drops the copy. Your original database is **not modified**.
+- If `testDb` exists, `sstr` backs it up, restores a copy as `{testDb}_sstr_{random}`, runs tests against the copy, then drops the copy. Your original database is **not modified**.
 
 If you want tests to run against a schema that already exists (your real schema), point `testDb` at a database that already has it. `sstr` will back it up and restore a copy, so your original stays safe.
 

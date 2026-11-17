@@ -81,7 +81,7 @@ mock.module("../src/database.js", {
     dropDatabase: async () => {},
     backupAndRestore: async (_cfg, source, target) =>
       `/tmp/sstr_${source}_${target}.bak`,
-    listSstDatabases: async () => [],
+    listSstrDatabases: async () => [],
     listStoredProcedures: async () => globalThis.__testProcedures ?? [],
     executeTestProcedure: async (_cfg, _db, fullName) => {
       const lower = fullName.toLowerCase();

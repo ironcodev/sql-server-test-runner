@@ -50,7 +50,7 @@ Validation rules:
 |---|---|---|---|
 | `loginTimeout` | number | — | Connection timeout in seconds (`-l`). |
 | `queryTimeout` | number | — | Query timeout in seconds (`-t`). |
-| `testDb` | string | `sst_testdb` | Test database name. See [Database Lifecycle](database-lifecycle.md). |
+| `testDb` | string | `sstr_testdb` | Test database name. See [Database Lifecycle](database-lifecycle.md). |
 | `backupPath` | string | SQL Server default | Directory for `.bak` files and restored data files. Must be writable by the SQL Server service account. If empty, `sstr` asks SQL Server for its default backup path, then data path, then log path. |
 | `cleanupBackup` | boolean | `false` | If `true`, delete the `.bak` file after the run (only when the database was dropped). |
 | `testRegex` | string | `(tests/.*\|(\\\\.\|/)(test\|spec))\\\\.sql$` | Regex matched against the **relative path** of each `.sql` file. |
@@ -83,20 +83,20 @@ Arrays run in order; if one file fails, the run aborts.
 
 If a configured script path does not exist, the run aborts with an error.
 
-### \`defaultTestOptions\`
+### `defaultTestOptions`
 
 Default per-test options applied to every test before the per-file JSON options.
-Same shape as the \`options\` object in per-file JSON files.
+Same shape as the `options` object in per-file JSON files.
 
-\`\`\`json
+```json
 {
   "defaultTestOptions": {
     "logExecution": true
   }
 }
-\`\`\`
+```
 
-Priority: \`defaultTestOptions\` < per-file \`options\` < per-test \`tests.<name>\` < CLI.
+Priority: `defaultTestOptions` < per-file `options` < per-test `tests.<name>` < CLI.
 
 ### `sqlCmdOptions`
 

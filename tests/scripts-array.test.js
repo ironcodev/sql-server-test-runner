@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, mkdir, writeFile, rm } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
+import { readTextFile } from "../src/file-utils.js";
 
 mock.module("../src/database.js", {
   exports: {
@@ -11,7 +12,7 @@ mock.module("../src/database.js", {
     createDatabase: async () => {},
     dropDatabase: async () => {},
     backupAndRestore: async () => null,
-    listSstDatabases: async () => [],
+    listSstrDatabases: async () => [],
     listStoredProcedures: async () => [],
     executeTestProcedure: async () => ({ code: 0, stdout: "", stderr: "" }),
   },
@@ -26,7 +27,14 @@ const fakeRunSqlcmd = async (args, options) => {
   const iIndex = args.indexOf("-i");
   if (iIndex !== -1) {
     const filePath = args[iIndex + 1] || "";
-    if (filePath.includes("fail-script")) {
+    // Read the file and check for a marker.
+    let content = "";
+    try {
+      content = await readTextFile(filePath);
+    } catch {
+      content = "";
+    }
+    if (content.includes("FAIL_ME") || content.includes("fail-script")) {
       return { code: 1, stdout: "", stderr: "boom" };
     }
     return { code: 0, stdout: "", stderr: "" };
@@ -47,10 +55,10 @@ async function reset() {
   await mkdir(root, { recursive: true });
 }
 
-async function writeSql(name) {
+async function writeSql(name, content = "select 1") {
   const full = join(root, name);
   await mkdir(join(full, ".."), { recursive: true });
-  await writeFile(full, "select 1", "utf-8");
+  await writeFile(full, content, "utf-8");
   return full;
 }
 
@@ -110,21 +118,20 @@ describe("scripts as arrays", () => {
     const cfg = baseConfig({ scripts: { warmUp: "tests/warmup1.sql" } });
     await run(cfg, { cwd: root });
 
-    const calls = sqlcmdCalls.filter(
-      (item) => item.options.label == "warmUp",
-    );
+    const calls = sqlcmdCalls.filter((item) => item.options.label == "warmUp");
     assert.equal(calls.length, 1);
   });
 
   test("aborts when a warmUp file fails", async () => {
     await reset();
-    await writeSql("tests/fail-script.sql");
-    await writeSql("tests/warmup2.sql");
+    await writeSql("tests/fail-script.sql", "FAIL_ME");
+    await writeSql("tests/warmup2.sql", "select 1");
     sqlcmdCalls.length = 0;
 
     const cfg = baseConfig({
       scripts: { warmUp: ["tests/fail-script.sql", "tests/warmup2.sql"] },
     });
+
     await assert.rejects(
       () => run(cfg, { cwd: root }),
       /warmUp "tests\/fail-script\.sql" failed/,

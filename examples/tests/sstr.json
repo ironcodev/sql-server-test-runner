@@ -1,0 +1,6 @@
+{
+  "sum": {
+    "transaction": true,
+    "logExecution": false
+  }
+}

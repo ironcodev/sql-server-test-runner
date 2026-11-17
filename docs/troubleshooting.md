@@ -50,18 +50,18 @@ sstr connect --env development --detailed-report
 
 The `--detailed-report` flag prints the exact `sqlcmd` command and its raw output.
 
-## `Database "sst_testdb" already exists`
+## `Database "sstr_testdb" already exists`
 
-The default test database `sst_testdb` must not pre-exist. Either:
+The default test database `sstr_testdb` must not pre-exist. Either:
 
 - Drop it:
   ```sql
-  alter database [sst_testdb] set single_user with rollback immediate;
-  drop database [sst_testdb];
+  alter database [sstr_testdb] set single_user with rollback immediate;
+  drop database [sstr_testdb];
   ```
 - Or set `testDb` to a different name in `sstr.config.json`.
 
-If a previous run crashed and left `sst_testdb` behind, run:
+If a previous run crashed and left `sstr_testdb` behind, run:
 
 ```bash
 sstr clean --yes
@@ -147,23 +147,23 @@ This is a known Node.js bug on Windows (versions 23–25) that can appear when a
 
 ## Invalid JSON in per-test options
 
-If \`sstr\` aborts with:
+If `sstr` aborts with:
 
-\`\`\`text
+```text
 Invalid JSON in "tests/sum.test.json": ...
-\`\`\`
+```
 
 fix the JSON syntax. You can validate it with:
 
-\`\`\`bash
+```bash
 node -e "JSON.parse(require('fs').readFileSync('tests/sum.test.json','utf8'))"
-\`\`\`
+```
 
 ## Unknown option warning
 
-\`\`\`text
+```text
 [sstr] Warning: Unknown option "timer" in "options" of "tests/sum.test.json".
-\`\`\`
+```
 
 The warning does not stop the run. Check the spelling against the list in
 [Writing Tests](writing-tests.md#options).

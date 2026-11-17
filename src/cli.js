@@ -11,7 +11,7 @@ import {
   checkConnection,
   databaseExists,
   dropDatabase,
-  listSstDatabases,
+  listSstrDatabases,
 } from "./database.js";
 import { runSqlcmd, buildConnectionArgs } from "./sqlcmd.js";
 import { loadSstrEnv } from "./env.js";
@@ -460,7 +460,7 @@ export async function cmdClean(opts) {
 
   const { cfg } = await prepareContext(opts);
 
-  const testDb = cfg.testDb || "sst_testdb";
+  const testDb = cfg.testDb || "sstr_testdb";
   const backupPath = cfg.backupPath || null;
 
   console.log("Cleaning up test artifacts...");
@@ -470,7 +470,7 @@ export async function cmdClean(opts) {
   if (await databaseExists(cfg, testDb, { debug: opts.detailed })) {
     dbTargets.add(testDb);
   }
-  const restored = await listSstDatabases(cfg, testDb, {
+  const restored = await listSstrDatabases(cfg, testDb, {
     debug: opts.detailed,
   });
   for (const d of restored) dbTargets.add(d);
