@@ -7,36 +7,38 @@ import assert from "node:assert/strict";
 
 const sqlcmdCalls = [];
 
+const fakeRunSqlcmd = async (args) => {
+  sqlcmdCalls.push(args);
+  const sql = args.join(" ");
+
+  // Parameter lookup.
+  if (sql.includes("from sys.parameters")) {
+    return { code: 0, stdout: "@a\n@b", stderr: "" };
+  }
+
+  // Connection check.
+  if (sql.includes("select 1")) {
+    return { code: 0, stdout: "1", stderr: "" };
+  }
+
+  // Procedure execution.
+  if (sql.includes("exec [")) {
+    if (sql.includes("[fail]")) {
+      return {
+        code: 1,
+        stdout: "",
+        stderr: "Msg 50000, Level 16, State 1, Procedure fail",
+      };
+    }
+    return { code: 0, stdout: "1", stderr: "" };
+  }
+
+  return { code: 0, stdout: "", stderr: "" };
+};
+
 mock.module("../src/sqlcmd.js", {
   exports: {
-    runSqlcmd: async (args) => {
-      sqlcmdCalls.push(args);
-      const sql = args.join(" ");
-
-      // Parameter lookup.
-      if (sql.includes("from sys.parameters")) {
-        return { code: 0, stdout: "@a\n@b", stderr: "" };
-      }
-
-      // Connection check.
-      if (sql.includes("select 1")) {
-        return { code: 0, stdout: "1", stderr: "" };
-      }
-
-      // Procedure execution.
-      if (sql.includes("exec [")) {
-        if (sql.includes("[fail]")) {
-          return {
-            code: 1,
-            stdout: "",
-            stderr: "Msg 50000, Level 16, State 1, Procedure fail",
-          };
-        }
-        return { code: 0, stdout: "1", stderr: "" };
-      }
-
-      return { code: 0, stdout: "", stderr: "" };
-    },
+    runSqlcmd: fakeRunSqlcmd,
     buildConnectionArgs: (cfg, { database } = {}) => {
       const args = ["-S", cfg.connection?.server ?? "localhost", "-b"];
       if (database) args.push("-d", database);
@@ -45,12 +47,14 @@ mock.module("../src/sqlcmd.js", {
   },
 });
 
-const { executeTestProcedure, buildSqlServerPath } = await import("../src/database.js");
+const { executeTestProcedure, buildSqlServerPath } =
+  await import("../src/database.js");
 
 function baseConfig(overrides = {}) {
   return {
     connection: { server: "localhost", trustedConnection: true },
     queryTimeout: 30,
+    runSqlcmd: fakeRunSqlcmd,
     ...overrides,
   };
 }
@@ -94,11 +98,17 @@ describe("executeTestProcedure", () => {
   test("looks up parameters and executes with null for each", async () => {
     sqlcmdCalls.length = 0;
 
-    const res = await executeTestProcedure(baseConfig(), "testdb", "dbo.test_pass");
+    const res = await executeTestProcedure(
+      baseConfig(),
+      "testdb",
+      "dbo.test_pass",
+    );
 
     assert.equal(res.code, 0);
 
-    const execCall = sqlcmdCalls.find((args) => args.join(" ").includes("exec ["));
+    const execCall = sqlcmdCalls.find((args) =>
+      args.join(" ").includes("exec ["),
+    );
     assert.ok(execCall, "expected an exec call");
     const sql = execCall.join(" ");
 
@@ -117,7 +127,9 @@ describe("executeTestProcedure", () => {
       useTransaction: false,
     });
 
-    const execCall = sqlcmdCalls.find((args) => args.join(" ").includes("exec ["));
+    const execCall = sqlcmdCalls.find((args) =>
+      args.join(" ").includes("exec ["),
+    );
     const sql = execCall.join(" ");
 
     assert.doesNotMatch(sql, /begin transaction/);
@@ -132,7 +144,9 @@ describe("executeTestProcedure", () => {
       queryTimeout: 5,
     });
 
-    const execCall = sqlcmdCalls.find((args) => args.join(" ").includes("exec ["));
+    const execCall = sqlcmdCalls.find((args) =>
+      args.join(" ").includes("exec ["),
+    );
 
     const tIndex = execCall.indexOf("-t");
     assert.notEqual(tIndex, -1, "expected -t in args");
@@ -146,7 +160,9 @@ describe("executeTestProcedure", () => {
       queryTimeout: null,
     });
 
-    const execCall = sqlcmdCalls.find((args) => args.join(" ").includes("exec ["));
+    const execCall = sqlcmdCalls.find((args) =>
+      args.join(" ").includes("exec ["),
+    );
 
     assert.equal(execCall.indexOf("-t"), -1);
   });
@@ -161,6 +177,9 @@ describe("executeTestProcedure", () => {
   });
 
   test("throws on an invalid procedure name", async () => {
-    await assert.rejects(() => executeTestProcedure(baseConfig(), "testdb", "no_schema"), /Invalid procedure name/);
+    await assert.rejects(
+      () => executeTestProcedure(baseConfig(), "testdb", "no_schema"),
+      /Invalid procedure name/,
+    );
   });
 });

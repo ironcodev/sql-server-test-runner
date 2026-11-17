@@ -203,6 +203,10 @@ async function prepareContext(opts) {
   });
   validateConfig(cfg);
 
+  if (cfg.runSqlcmd == null) {
+    cfg.runSqlcmd = runSqlcmd;
+  }
+
   return { cfg, colorEnabled };
 }
 
@@ -405,7 +409,11 @@ export async function cmdConnect(opts) {
       "-Q",
       "set nocount on; select @@version as v, db_name() as d;",
     );
-    const res = await runSqlcmd(args, { debug: opts.detailed });
+    const _runSqlcmd = cfg.runSqlcmd || runSqlcmd;
+    const res = await _runSqlcmd(args, {
+      debug: opts.detailed,
+      label: "getDatabaseInfo",
+    });
     if (res.code === 0) {
       const line = res.stdout.trim().split(/\r?\n/)[0] || "";
       const [v, d] = line.split("|");

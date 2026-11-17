@@ -1,46 +1,46 @@
 import { test, describe, mock } from "node:test";
 import assert from "node:assert/strict";
 
-// Mock sqlcmd.js BEFORE importing database.js.
 const sqlcmdCalls = [];
 
-mock.module("../src/sqlcmd.js", {
-  namedExports: {
-    runSqlcmd: async (args) => {
-      sqlcmdCalls.push(args);
-      const sql = args.join(" ");
+const fakeRunSqlcmd = async (args) => {
+  sqlcmdCalls.push(args);
+  const sql = args.join(" ");
 
-      // Mock specific queries by their content.
-      if (sql.includes("db_id(") && sql.includes("select case")) {
-        // databaseExists
-        return { code: 0, stdout: "1", stderr: "" };
-      }
-      if (sql.includes("sys.databases")) {
-        // listSstDatabases
-        return { code: 0, stdout: "db1\nsstr_db_sstr_1\ndb2", stderr: "" };
-      }
-      if (sql.includes("from sys.parameters")) {
-        return { code: 0, stdout: "@a\n@b", stderr: "" };
-      }
-      if (sql.includes("exec [")) {
-        return { code: 0, stdout: "1", stderr: "" };
-      }
-      if (sql.includes("InstanceDefaultBackupPath")) {
-        return { code: 0, stdout: "C:\\Backups", stderr: "" };
-      }
-      if (sql.includes("sys.master_files")) {
-        return {
-          code: 0,
-          stdout:
-            "mydb|C:\\data\\mydb.mdf|ROWS\nmydb_log|C:\\data\\mydb.ldf|LOG",
-          stderr: "",
-        };
-      }
-      if (sql.includes("select 1")) {
-        return { code: 0, stdout: "1", stderr: "" };
-      }
-      return { code: 0, stdout: "", stderr: "" };
-    },
+  // Mock specific queries by their content.
+  if (sql.includes("db_id(") && sql.includes("select case")) {
+    // databaseExists
+    return { code: 0, stdout: "1", stderr: "" };
+  }
+  if (sql.includes("sys.databases")) {
+    // listSstDatabases
+    return { code: 0, stdout: "db1\nsstr_db_sstr_1\ndb2", stderr: "" };
+  }
+  if (sql.includes("from sys.parameters")) {
+    return { code: 0, stdout: "@a\n@b", stderr: "" };
+  }
+  if (sql.includes("exec [")) {
+    return { code: 0, stdout: "1", stderr: "" };
+  }
+  if (sql.includes("InstanceDefaultBackupPath")) {
+    return { code: 0, stdout: "C:\\Backups", stderr: "" };
+  }
+  if (sql.includes("sys.master_files")) {
+    return {
+      code: 0,
+      stdout: "mydb|C:\\data\\mydb.mdf|ROWS\nmydb_log|C:\\data\\mydb.ldf|LOG",
+      stderr: "",
+    };
+  }
+  if (sql.includes("select 1")) {
+    return { code: 0, stdout: "1", stderr: "" };
+  }
+  return { code: 0, stdout: "", stderr: "" };
+};
+
+mock.module("../src/sqlcmd.js", {
+  exports: {
+    runSqlcmd: fakeRunSqlcmd,
     buildConnectionArgs: (cfg, { database } = {}) => {
       const args = ["-S", cfg.connection?.server ?? "localhost", "-b"];
       if (database) args.push("-d", database);
@@ -62,6 +62,7 @@ const {
 function baseConfig(overrides = {}) {
   return {
     connection: { server: "localhost", trustedConnection: true },
+    runSqlcmd: fakeRunSqlcmd,
     ...overrides,
   };
 }

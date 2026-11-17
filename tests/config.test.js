@@ -16,7 +16,10 @@ describe("validateConfig", () => {
   });
 
   test("rejects missing server", () => {
-    assert.throws(() => validateConfig({ connection: {} }), /"connection.server" is required/);
+    assert.throws(
+      () => validateConfig({ connection: {} }),
+      /"connection.server" is required/,
+    );
   });
 
   test("accepts trustedConnection without username/password", () => {
@@ -48,7 +51,9 @@ describe("validateConfig", () => {
   });
 
   test("accepts comma-separated testSchema", () => {
-    assert.doesNotThrow(() => validateConfig({ ...validConfig(), testSchema: "sstr, tests" }));
+    assert.doesNotThrow(() =>
+      validateConfig({ ...validConfig(), testSchema: "sstr, tests" }),
+    );
   });
 
   test("rejects defaultTestOptions that is an array", () => {
@@ -68,7 +73,33 @@ describe("validateConfig", () => {
   });
 
   test("rejects negative queryTimeout type", () => {
-    assert.throws(() => validateConfig({ ...validConfig(), queryTimeout: "10" }), /"queryTimeout" must be a number/);
+    assert.throws(
+      () => validateConfig({ ...validConfig(), queryTimeout: "10" }),
+      /"queryTimeout" must be a number/,
+    );
+  });
+
+  test("accepts scripts as arrays", () => {
+    assert.doesNotThrow(() =>
+      validateConfig({
+        ...validConfig(),
+        scripts: {
+          warmUp: ["a.sql", "b.sql"],
+          coolDown: "c.sql",
+        },
+      }),
+    );
+  });
+
+  test("rejects scripts arrays with non-string entries", () => {
+    assert.throws(
+      () =>
+        validateConfig({
+          ...validConfig(),
+          scripts: { warmUp: ["a.sql", 42] },
+        }),
+      /"scripts\.warmUp" must be a string or an array of strings/,
+    );
   });
 });
 

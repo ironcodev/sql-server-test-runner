@@ -30,12 +30,12 @@ function resolveSqlcmdCommand() {
  * On Windows, `sqlcmd` is resolved via PATH; no shell is used, so arguments
  * are passed verbatim to the process and no escaping is needed.
  */
-export function runSqlcmd(args, { cwd, input, debug = false } = {}) {
+export function runSqlcmd(args, { cwd, input, debug = false, label } = {}) {
   const command = resolveSqlcmdCommand();
   const printable = [command, ...args].join(" ");
-  
+
   if (debug) {
-    console.error(`[sstr] $ ${printable}`);
+    console.error(`${label}: [sstr] $ ${printable}`);
   }
 
   return new Promise((resolve) => {

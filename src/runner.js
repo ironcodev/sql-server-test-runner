@@ -42,17 +42,46 @@ function extractSqlErrorNumber(text) {
   return match ? Number(match[1]) : null;
 }
 
+/**
+ * Runs one or more SQL scripts against the given database.
+ * `paths` may be a single string or an array of strings.
+ * Files run sequentially; the first failure aborts the rest.
+ */
+async function runScriptsOnDb(
+  cfg,
+  dbName,
+  paths,
+  { cwd = process.cwd(), assertSchema, debug, label = "script" } = {},
+) {
+  if (paths == null) return;
+  const list = Array.isArray(paths) ? paths : [paths];
+  for (const p of list) {
+    if (typeof p !== "string") {
+      throw new Error(`Invalid ${label} path: ${JSON.stringify(p)}`);
+    }
+    const full = resolvePath(cwd, p);
+    const res = await runScriptOnDb(cfg, dbName, full, {
+      assertSchema,
+      debug,
+      label
+    });
+    if (res.code !== 0) {
+      throw new Error(`${label} "${p}" failed:\n${res.stderr || res.stdout}`);
+    }
+  }
+}
+
 async function runScriptOnDb(
   cfg,
   dbName,
   scriptPath,
-  { assertSchema, debug, testSuite } = {},
+  { assertSchema, debug, testSuite, label } = {},
 ) {
   let scriptText;
   try {
     scriptText = await readTextFile(scriptPath);
   } catch (e) {
-    throw new Error(`Failed to read "${scriptPath}": ${e.message}`);
+    throw new Error(`${label}. Failed to read "${scriptPath}": ${e.message}`);
   }
 
   const lines = [];
@@ -69,8 +98,9 @@ async function runScriptOnDb(
 
   try {
     const args = buildConnectionArgs(cfg, { database: dbName });
+    const _runSqlcmd = cfg.runSqlcmd || runSqlcmd;
     args.push("-i", tmpFile);
-    return await runSqlcmd(args, { debug });
+    return await _runSqlcmd(args, { debug, label });
   } finally {
     try {
       await unlink(tmpFile);
@@ -84,7 +114,7 @@ async function runScriptTextOnDb(
   cfg,
   dbName,
   scriptText,
-  { assertSchema, debug } = {},
+  { assertSchema, debug, label } = {},
 ) {
   const lines = [];
   if (assertSchema) lines.push(`:setvar AssertSchema "${assertSchema}"`);
@@ -99,8 +129,9 @@ async function runScriptTextOnDb(
 
   try {
     const args = buildConnectionArgs(cfg, { database: dbName });
+    const _runSqlcmd = cfg.runSqlcmd || runSqlcmd;
     args.push("-i", tmpFile);
-    return await runSqlcmd(args, { debug });
+    return await _runSqlcmd(args, { debug, label });
   } finally {
     try {
       await unlink(tmpFile);
@@ -216,6 +247,7 @@ export async function run(
     const assertRes = await runScriptTextOnDb(cfg, targetDb, assertSql, {
       assertSchema,
       debug: false,
+      label: "assertions"
     });
     if (assertRes.code !== 0) {
       throw new Error(
@@ -239,15 +271,15 @@ export async function run(
     }
 
     if (scripts.warmUp) {
-      const warmUpPath = resolvePath(cwd, scripts.warmUp);
-      progressLogger.log(`Running warmUp: ${warmUpPath}`);
-      const res = await runScriptOnDb(cfg, targetDb, warmUpPath, {
+      progressLogger.log(
+        `Running warmUp: ${Array.isArray(scripts.warmUp) ? scripts.warmUp.join(", ") : scripts.warmUp}`,
+      );
+      await runScriptsOnDb(cfg, targetDb, scripts.warmUp, {
+        cwd,
         assertSchema,
         debug,
+        label: "warmUp",
       });
-      if (res.code !== 0) {
-        throw new Error(`warmUp script failed:\n${res.stderr || res.stdout}`);
-      }
     }
 
     const testedProcedures = new Set();
@@ -279,16 +311,12 @@ export async function run(
       initLogger(`  ${file} ...`);
 
       if (scripts.preScript) {
-        const p = resolvePath(cwd, scripts.preScript);
-        const res = await runScriptOnDb(cfg, targetDb, p, {
+        await runScriptsOnDb(cfg, targetDb, scripts.preScript, {
+          cwd,
           assertSchema,
           debug,
+          label: `preScript for "${file}"`,
         });
-        if (res.code !== 0) {
-          throw new Error(
-            `preScript failed for "${file}":\n${res.stderr || res.stdout}`,
-          );
-        }
       }
 
       const t0 = nowMs();
@@ -348,16 +376,12 @@ export async function run(
           }
 
           if (effective.preScript) {
-            const p = resolvePath(cwd, effective.preScript);
-            const preRes = await runScriptOnDb(cfg, targetDb, p, {
+            await runScriptsOnDb(cfg, targetDb, effective.preScript, {
+              cwd,
               assertSchema,
               debug,
+              label: `preScript for "${full}"`,
             });
-            if (preRes.code !== 0) {
-              throw new Error(
-                `preScript for "${full}" failed:\n${preRes.stderr || preRes.stdout}`,
-              );
-            }
           }
 
           const t1 = nowMs();
@@ -369,16 +393,12 @@ export async function run(
           const t2 = nowMs() - t1;
 
           if (effective.postScript) {
-            const p = resolvePath(cwd, effective.postScript);
-            const postRes = await runScriptOnDb(cfg, targetDb, p, {
+            await runScriptsOnDb(cfg, targetDb, effective.postScript, {
+              cwd,
               assertSchema,
               debug,
+              label: `postScript for "${full}"`,
             });
-            if (postRes.code !== 0) {
-              throw new Error(
-                `postScript for "${full}" failed:\n${postRes.stderr || postRes.stdout}`,
-              );
-            }
           }
 
           const succeeded = execRes.code === 0;
@@ -438,16 +458,12 @@ export async function run(
       }
 
       if (scripts.postScript) {
-        const p = resolvePath(cwd, scripts.postScript);
-        const postRes = await runScriptOnDb(cfg, targetDb, p, {
+        await runScriptsOnDb(cfg, targetDb, scripts.postScript, {
+          cwd,
           assertSchema,
           debug,
+          label: `postScript for "${file}"`,
         });
-        if (postRes.code !== 0) {
-          throw new Error(
-            `postScript failed for "${file}":\n${postRes.stderr || postRes.stdout}`,
-          );
-        }
       }
 
       // One-line summary for this file.
@@ -470,15 +486,15 @@ export async function run(
     }
 
     if (!bailed && scripts.coolDown) {
-      const p = resolvePath(cwd, scripts.coolDown);
-      progressLogger.log(`Running coolDown: ${p}`);
-      const res = await runScriptOnDb(cfg, targetDb, p, {
+      progressLogger.log(
+        `Running coolDown: ${Array.isArray(scripts.coolDown) ? scripts.coolDown.join(", ") : scripts.coolDown}`,
+      );
+      await runScriptsOnDb(cfg, targetDb, scripts.coolDown, {
+        cwd,
         assertSchema,
         debug,
+        label: "coolDown",
       });
-      if (res.code !== 0) {
-        throw new Error(`coolDown script failed:\n${res.stderr || res.stdout}`);
-      }
     }
 
     const finishedAt = new Date();

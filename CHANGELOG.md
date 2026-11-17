@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-17
+
+### Added
+
+- `scripts.warmUp`, `scripts.coolDown`, `scripts.preScript`, and
+  `scripts.postScript` now accept an array of paths in addition to a single
+  string. Files run in order; the first failure aborts the rest.
+- `preScript` and `postScript` in per-SP options also accept arrays.
+
 ## [2.0.0] - 2026-11-16
 
 ### Added

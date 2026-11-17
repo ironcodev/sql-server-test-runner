@@ -130,8 +130,8 @@ one file.
 | `logExecution` | boolean | `false` | Measure and report the execution time. |
 | `skip` | boolean | `false` | Skip the test. |
 | `timeout` | number | `null` | Query timeout in seconds for this test. |
-| `preScript` | string | `null` | Path to a `.sql` file that runs before this test. |
-| `postScript` | string | `null` | Path to a `.sql` file that runs after this test. |
+| `preScript` | string or string[] | `null` | Path(s) to `.sql` file(s) that run before this test. |
+| `postScript` | string or string[] | `null` | Path(s) to `.sql` file(s) that run after this test. |
 | `throws` | boolean or number | `false` | Require the test to fail (any error, or a specific SQL Server error number). |
 
 ### Resolution order

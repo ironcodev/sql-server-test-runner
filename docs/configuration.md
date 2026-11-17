@@ -60,7 +60,8 @@ Validation rules:
 
 ### `scripts`
 
-All optional. Each value is a path to a `.sql` file, relative to `--cwd`.
+All optional. Each value is a path to a `.sql` file (relative to `--cwd`),
+or an array of paths that run in order.
 
 | Key | When it runs |
 |---|---|
@@ -68,6 +69,17 @@ All optional. Each value is a path to a `.sql` file, relative to `--cwd`.
 | `coolDown` | Once, after all test files. |
 | `preScript` | Before each test file. |
 | `postScript` | After each test file. |
+
+Arrays run in order; if one file fails, the run aborts.
+
+```json
+{
+  "scripts": {
+    "warmUp": ["tests/setup1.sql", "tests/setup2.sql"],
+    "coolDown": "tests/cleanup.sql"
+  }
+}
+```
 
 If a configured script path does not exist, the run aborts with an error.
 

@@ -218,6 +218,16 @@ export async function loadTestOptions(testFilePath) {
       }
     }
     tests.set(procName.toLowerCase(), procOpts);
+    // In loadTestOptions, after checking keys:
+    for (const [k, v] of Object.entries(procOpts)) {
+      if (k === "preScript" || k === "postScript") {
+        if (v != null && typeof v !== "string" && !Array.isArray(v)) {
+          throw new Error(
+            `"${k}" for test "${procName}" must be a string or an array of strings.`,
+          );
+        }
+      }
+    }
   }
 
   return { tests, warnings, jsonPath };

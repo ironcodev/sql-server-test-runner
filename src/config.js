@@ -151,9 +151,22 @@ export function validateConfig(cfg) {
   }
   if (cfg.scripts && typeof cfg.scripts === "object") {
     for (const k of ["warmUp", "coolDown", "preScript", "postScript"]) {
-      if (cfg.scripts[k] != null && typeof cfg.scripts[k] !== "string") {
-        throw new Error(`"scripts.${k}" must be a string path.`);
+      const v = cfg.scripts[k];
+      if (v == null) continue;
+      if (typeof v === "string") continue;
+      if (Array.isArray(v)) {
+        for (const item of v) {
+          if (typeof item !== "string") {
+            throw new Error(
+              `"scripts.${k}" must be a string or an array of strings.`,
+            );
+          }
+        }
+        continue;
       }
+      throw new Error(
+        `"scripts.${k}" must be a string or an array of strings.`,
+      );
     }
   }
 }

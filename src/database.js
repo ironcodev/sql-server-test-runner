@@ -18,20 +18,32 @@ export function buildSqlServerPath(dir, fileName, platform = process.platform) {
   return full.replace(/'/g, "''");
 }
 
-async function queryScalar(cfg, query, database = "master", { debug = false } = {}) {
+async function queryScalar(
+  cfg,
+  query,
+  database = "master",
+  { debug = false, label } = {},
+) {
   const args = buildConnectionArgs(cfg, { database });
+  const _runSqlcmd = cfg.runSqlcmd || runSqlcmd;
   args.push("-h", "-1", "-W", "-Q", query);
-  const res = await runSqlcmd(args, { debug });
+  const res = await _runSqlcmd(args, { debug, label });
   if (res.code !== 0) {
     throw new Error(`Query failed: ${res.stderr || res.stdout}`);
   }
   return res.stdout.trim();
 }
 
-async function queryRows(cfg, query, database = "master", { debug = false } = {}) {
+async function queryRows(
+  cfg,
+  query,
+  database = "master",
+  { debug = false, label } = {},
+) {
   const args = buildConnectionArgs(cfg, { database });
+  const _runSqlcmd = cfg.runSqlcmd || runSqlcmd;
   args.push("-h", "-1", "-W", "-s", "|", "-Q", query);
-  const res = await runSqlcmd(args, { debug });
+  const res = await _runSqlcmd(args, { debug, label });
   if (res.code !== 0) {
     throw new Error(`Query failed: ${res.stderr || res.stdout}`);
   }
@@ -42,28 +54,49 @@ async function queryRows(cfg, query, database = "master", { debug = false } = {}
     .map((line) => line.split("|"));
 }
 
-export async function checkConnection(cfg, { debug = false } = {}) {
+export async function checkConnection(
+  cfg,
+  { debug = false, label = "checkConnection" } = {},
+) {
   const args = buildConnectionArgs(cfg, { database: "master" });
+  const _runSqlcmd = cfg.runSqlcmd || runSqlcmd;
   args.push("-Q", "select 1");
-  const res = await runSqlcmd(args, { debug });
+  const res = await _runSqlcmd(args, { debug, label });
   if (res.code !== 0) {
-    throw new Error(`Failed to connect to the server:\n${(res.stderr || res.stdout || "").trim()}`);
+    throw new Error(
+      `Failed to connect to the server:\n${(res.stderr || res.stdout || "").trim()}`,
+    );
   }
 }
 
-export async function databaseExists(cfg, dbName, { debug = false } = {}) {
+export async function databaseExists(
+  cfg,
+  dbName,
+  { debug = false, label = "databaseExists" } = {},
+) {
   const safe = dbName.replace(/'/g, "''");
   const q = `set nocount on; select case when db_id('${safe}') is null then 0 else 1 end`;
-  const out = await queryScalar(cfg, q, "master", { debug });
+  const out = await queryScalar(cfg, q, "master", { debug, label });
   return out.startsWith("1");
 }
 
-export async function createDatabase(cfg, dbName, { debug = false } = {}) {
+export async function createDatabase(
+  cfg,
+  dbName,
+  { debug = false, label = "createDatabase" } = {},
+) {
   const safe = dbName.replace(/[\]\[]/g, "");
-  await queryScalar(cfg, `create database [${safe}]`, "master", { debug });
+  await queryScalar(cfg, `create database [${safe}]`, "master", {
+    debug,
+    label,
+  });
 }
 
-export async function dropDatabase(cfg, dbName, { debug = false } = {}) {
+export async function dropDatabase(
+  cfg,
+  dbName,
+  { debug = false, label = "dropDatabase" } = {},
+) {
   const safe = dbName.replace(/[\]\[]/g, "");
   const safeStr = safe.replace(/'/g, "''");
   const q = `
@@ -72,10 +105,13 @@ export async function dropDatabase(cfg, dbName, { debug = false } = {}) {
       alter database [${safe}] set single_user with rollback immediate;
       drop database [${safe}];
     end`;
-  await queryScalar(cfg, q, "master", { debug });
+  await queryScalar(cfg, q, "master", { debug, label });
 }
 
-async function resolveBackupDir(cfg, { debug = false } = {}) {
+async function resolveBackupDir(
+  cfg,
+  { debug = false, label = "resolveBackupDir" } = {},
+) {
   if (cfg.backupPath && cfg.backupPath.trim() !== "") {
     const dir = cfg.backupPath;
     try {
@@ -86,6 +122,7 @@ async function resolveBackupDir(cfg, { debug = false } = {}) {
     return dir;
   }
 
+  const _runSqlcmd = cfg.runSqlcmd || runSqlcmd;
   // Ask SQL Server for its default paths.
   const args = buildConnectionArgs(cfg, { database: "master" });
   args.push(
@@ -100,9 +137,11 @@ async function resolveBackupDir(cfg, { debug = false } = {}) {
     "-s",
     "|",
   );
-  const res = await runSqlcmd(args, { debug });
+  const res = await _runSqlcmd(args, { debug, label });
   if (res.code !== 0) {
-    throw new Error(`Failed to query SQL Server default paths: ${res.stderr || res.stdout}`);
+    throw new Error(
+      `Failed to query SQL Server default paths: ${res.stderr || res.stdout}`,
+    );
   }
   const line = res.stdout.trim().split(/\r?\n/)[0] || "";
   const [backupPath, dataPath, logPath] = line.split("|").map((s) => s.trim());
@@ -122,7 +161,12 @@ async function resolveBackupDir(cfg, { debug = false } = {}) {
  * Backs up sourceDb to a .bak file, then restores it under targetDb.
  * Filegroups and their files are preserved.
  */
-export async function backupAndRestore(cfg, sourceDb, targetDb, { debug = false } = {}) {
+export async function backupAndRestore(
+  cfg,
+  sourceDb,
+  targetDb,
+  { debug = false } = {},
+) {
   const safeSource = sourceDb.replace(/[\]\[]/g, "");
   const safeTarget = targetDb.replace(/[\]\[]/g, "");
   const safeSourceStr = safeSource.replace(/'/g, "''");
@@ -134,7 +178,10 @@ export async function backupAndRestore(cfg, sourceDb, targetDb, { debug = false 
   const backupFileSql = buildSqlServerPath(backupDir, backupName);
 
   const backupQ = `backup database [${safeSource}] to disk = N'${backupFileSql}' with init, copy_only`;
-  await queryScalar(cfg, backupQ, "master", { debug });
+  await queryScalar(cfg, backupQ, "master", {
+    debug,
+    label: "backupDatabase",
+  });
 
   const files = await queryRows(
     cfg,
@@ -144,7 +191,7 @@ export async function backupAndRestore(cfg, sourceDb, targetDb, { debug = false 
      where mf.database_id = db_id('${safeSourceStr}')
      order by mf.file_id;`,
     "master",
-    { debug },
+    { debug, label: "getDatabaseFiles" },
   );
 
   if (files.length === 0) {
@@ -164,7 +211,10 @@ export async function backupAndRestore(cfg, sourceDb, targetDb, { debug = false 
   const restoreQ = `restore database [${safeTarget}] from disk = N'${backupFileSql}' with replace, ${moves.join(
     ",\n",
   )}`;
-  await queryScalar(cfg, restoreQ, "master", { debug });
+  await queryScalar(cfg, restoreQ, "master", {
+    debug,
+    label: "restoreDatabase",
+  });
 
   return backupPathOnClient;
 }
@@ -172,14 +222,18 @@ export async function backupAndRestore(cfg, sourceDb, targetDb, { debug = false 
 /**
  * Lists stored procedures in the given database, formatted as "schema.name".
  */
-export async function listStoredProcedures(cfg, dbName, { debug = false } = {}) {
+export async function listStoredProcedures(
+  cfg,
+  dbName,
+  { debug = false, label = "listStoredProcedures" } = {},
+) {
   const q = `
     set nocount on;
     select s.name + '.' + p.name
     from sys.procedures p
     join sys.schemas s on s.schema_id = p.schema_id
     order by s.name, p.name;`;
-  const out = await queryScalar(cfg, q, dbName, { debug });
+  const out = await queryScalar(cfg, q, dbName, { debug, label });
   return out
     .split(/\r?\n/)
     .map((s) => s.trim())
@@ -219,7 +273,7 @@ export async function executeTestProcedure(
      where p.object_id = object_id('${safeFull}')
      order by p.parameter_id;`,
     dbName,
-    { debug },
+    { debug, label: "getTestSprocParams" },
   );
   const paramLines = paramsOut
     .split(/\r?\n/)
@@ -268,6 +322,7 @@ export async function executeTestProcedure(
   }
 
   const args = buildConnectionArgs(cfg, { database: dbName });
+  const _runSqlcmd = cfg.runSqlcmd || runSqlcmd;
 
   // Override the query timeout for this call if requested.
   if (queryTimeout != null) {
@@ -280,21 +335,26 @@ export async function executeTestProcedure(
   }
 
   args.push("-Q", execSql);
-  return runSqlcmd(args, { debug });
+
+  return _runSqlcmd(args, { debug, label: "execTestSproc" });
 }
 
 /**
  * Returns the list of databases whose names start with `${prefix}_sstr_`.
  * Uses ESCAPE to treat underscores literally.
  */
-export async function listSstDatabases(cfg, prefix, { debug = false } = {}) {
+export async function listSstDatabases(
+  cfg,
+  prefix,
+  { debug = false, label = "listSstDatabases" } = {},
+) {
   const safe = prefix.replace(/'/g, "''").replace(/[_%]/g, (m) => `\\${m}`);
   const q = `
     set nocount on;
     select name from sys.databases
     where name like '${safe}\\_sst\\_%' escape '\\'
     order by name;`;
-  const out = await queryScalar(cfg, q, "master", { debug });
+  const out = await queryScalar(cfg, q, "master", { debug, label });
   return out
     .split(/\r?\n/)
     .map((s) => s.trim())
