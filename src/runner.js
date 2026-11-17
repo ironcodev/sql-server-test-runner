@@ -23,6 +23,7 @@ import {
   normalizeThrows,
 } from "./options.js";
 import { readTextFile } from "./file-utils.js";
+import { makeColorizer } from "./util.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -63,7 +64,7 @@ async function runScriptsOnDb(
     const res = await runScriptOnDb(cfg, dbName, full, {
       assertSchema,
       debug,
-      label
+      label,
     });
     if (res.code !== 0) {
       throw new Error(`${label} "${p}" failed:\n${res.stderr || res.stdout}`);
@@ -207,10 +208,16 @@ export async function run(
 
   const initLogger =
     reportType === "console"
-      ? (msg) => logger.log(msg)
-      : (msg) => console.error(msg);
+      ? {
+          log: (msg) => logger.log(msg),
+          write: (msg) => process.stdout.write(msg),
+        }
+      : {
+          log: (msg) => console.error(msg),
+          write: (msg) => process.stdout.write(msg),
+        };
 
-  initLogger("Initializing ...");
+  initLogger.log("Initializing ...");
 
   progressLogger.log("Checking connection to the server...");
   await checkConnection(cfg, { debug });
@@ -247,7 +254,7 @@ export async function run(
     const assertRes = await runScriptTextOnDb(cfg, targetDb, assertSql, {
       assertSchema,
       debug: false,
-      label: "assertions"
+      label: "assertions",
     });
     if (assertRes.code !== 0) {
       throw new Error(
@@ -260,7 +267,7 @@ export async function run(
     reporter.setFiles(files);
     progressLogger.log(`Found ${files.length} test script file(s).`);
 
-    initLogger("Running tests ...");
+    initLogger.log("Running tests ...");
 
     const scripts = cfg.scripts || {};
 
@@ -282,10 +289,16 @@ export async function run(
       });
     }
 
+    const c = makeColorizer(color);
     const testedProcedures = new Set();
+    const root = process.cwd();
     let bailed = false;
+    let count = 0;
 
     for (const file of files) {
+      count++;
+
+      const filename = file.replace(root, "").replace(/\\/g, "/");
       if (bailed) break;
 
       // Load per-file JSON (per-SP settings).
@@ -304,11 +317,11 @@ export async function run(
 
       // Skip the whole file if requested at the file level.
       if (toBool(fileLevelOptions.skip, false)) {
-        initLogger(`  - ${file}  (skipped)`);
+        initLogger.log(`\n  ${c("cyan", count)}. ${filename} ${c("yellow", "(skipped)")}`);
         continue;
       }
 
-      initLogger(`  ${file} ...`);
+      initLogger.write(`\n  ${c("cyan", count)}. ${filename} `);
 
       if (scripts.preScript) {
         await runScriptsOnDb(cfg, targetDb, scripts.preScript, {
@@ -467,22 +480,32 @@ export async function run(
       }
 
       // One-line summary for this file.
+
       const fileResults = reporter.results.filter((r) => r.file === file);
       const pass = fileResults.filter((r) => r.passed && !r.skipped).length;
       const fail = fileResults.filter((r) => !r.passed && !r.skipped).length;
       const skipped = fileResults.filter((r) => r.skipped).length;
 
+      const badge =
+        fail > 0
+          ? c("red", "FAIL")
+          : pass > 0
+            ? c("green", "PASS")
+            : skipped > 0
+              ? c("yellow", "SKIP")
+              : c("gray", "EMPTY");
+      initLogger.write(`[${badge}]\n`);
+
       let summary;
-      if (fail > 0) {
-        summary = `  x ${file}  (${pass} pass, ${fail} fail${skipped ? `, ${skipped} skipped` : ""})`;
-      } else if (fileResults.length === 0) {
-        summary = `  - ${file}  (no test procedures found)`;
+      if (fileResults.length === 0) {
+        summary = `     (no test procedures found)`;
       } else if (pass === 0 && skipped > 0) {
-        summary = `  - ${file}  (${skipped} skipped)`;
+        summary = `     (${skipped} skipped)`;
       } else {
-        summary = `  + ${file}  (${pass} pass, ${fail} fail${skipped ? `, ${skipped} skipped` : ""})`;
+        summary = `     ( tests: ${fileResults.length}, pass: ${pass}, fail: ${fail}${skipped ? `, skipped: ${skipped}` : ""} )`;
       }
-      initLogger(summary);
+
+      initLogger.log(summary);
     }
 
     if (!bailed && scripts.coolDown) {
@@ -523,7 +546,7 @@ export async function run(
         }
       }
     } else {
-      initLogger(`Keeping test database "${targetDb}" (--keep-db).`);
+      initLogger.log(`Keeping test database "${targetDb}" (--keep-db).`);
     }
   }
 }

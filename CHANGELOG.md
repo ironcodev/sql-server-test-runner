@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-11-18
+
+### Enhanced console reporter
+- display relative paths of test files instead of absolute path. 
+- result of each file is reported right after runing the file.
+- removed duplicate file path reporting (both upon running and at the end of the whole test).
+- Used colorful test number and result badge for better UX.
+- Added a newline after each file report for to provide better distinctive visual.
+
 ## [2.1.0] - 2026-11-17
 
 ### Added

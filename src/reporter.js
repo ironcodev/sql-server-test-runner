@@ -1,17 +1,4 @@
-const COLORS = {
-  reset: "\x1b[0m",
-  red: "\x1b[31m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  cyan: "\x1b[36m",
-  gray: "\x1b[90m",
-  bold: "\x1b[1m",
-};
-
-function makeColorizer(enabled) {
-  if (!enabled) return () => (s) => s;
-  return (color, s) => `${COLORS[color] || ""}${s}${COLORS.reset}`;
-}
+import { makeColorizer } from "./util.js";
 
 class BaseReporter {
   constructor({ color = true } = {}) {
@@ -82,7 +69,7 @@ export class ConsoleReporter extends BaseReporter {
       console.log("");
     }
 
-    console.log(`Test script files: ${this.files.length}`);
+    console.log(`Total files: ${this.files.length}`);
 
     const byFile = new Map();
     for (const r of this.results) {
@@ -91,9 +78,14 @@ export class ConsoleReporter extends BaseReporter {
     }
 
     console.log("");
-    console.log("Per-file details:");
+    // console.log("Per-file details:");
+
+    // const root = process.cwd();
+
     for (const f of this.files) {
       const list = byFile.get(f) || [];
+      /*
+      const filename = f.replace(root, "").replace(/\\/g, '/');
       const skipped = list.filter((x) => x.skipped).length;
       const pass = list.filter((x) => x.passed && !x.skipped).length;
       const fail = list.filter((x) => !x.passed && !x.skipped).length;
@@ -105,13 +97,13 @@ export class ConsoleReporter extends BaseReporter {
             : skipped > 0
               ? c("gray", "SKIP")
               : c("gray", "EMPTY");
-      console.log(`  - ${f} [${badge}]`);
+      console.log(`  - ${filename} [${badge}]`);
       console.log(
         `      procedures: ${list.length}, pass: ${pass}, fail: ${fail}${
           skipped ? `, skipped: ${skipped}` : ""
         }`,
       );
-
+      */
       const withTime = list.filter((r) => r.durationMs != null);
       if (withTime.length > 0) {
         console.log("      execution times:");
@@ -170,7 +162,7 @@ export class ConsoleReporter extends BaseReporter {
     const warnLabel =
       warningCount > 0 ? c("yellow", `, warnings: ${warningCount}`) : "";
     console.log(
-      `Total: ${total}, ${passLabel}, ${failLabel}${skipLabel}${warnLabel}`,
+      `Tests: ${total}, ${passLabel}, ${failLabel}${skipLabel}${warnLabel}`,
     );
 
     const withTime = this.results.filter((r) => r.durationMs != null);
