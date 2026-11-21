@@ -12,7 +12,7 @@
   "testDb": "my_test_db",
   "backupPath": "C:/sstr-backups",
   "cleanupBackup": true,
-  "testRegex": "tests/.*\\.(test|spec)\\.sql$",
+  "testRegex": "^tests/.*\\.(test|spec)\\.sql$",
   "testMatch": "^test_",
   "testSchema": "sstr",
   "assertSchema": "Assert",

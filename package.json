@@ -9,6 +9,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test --experimental-test-module-mocks \"tests/**/*.test.js\"",
+    "test:sstr": "sstr run",
     "test:coverage": "node --test --experimental-test-module-mocks --experimental-test-coverage \"tests/**/*.test.js\"",
     "test:integration": "node scripts/test-integration.mjs",
     "start": "node bin/sstr.js"

@@ -66,6 +66,19 @@ begin
 end
 go
 
+/*
+    debugging levels:
+        query , q :  dynamic queries
+        vars  , v :  local variables
+        dvars , vd:  deep variables
+        lvars , vl:  loop variables
+        errors, e :  show error_message()
+        result, r :  results
+        time  , t :  time
+        proc  , p :  current procedure
+
+        all   , * :  everything
+*/
 create or alter function $(AssertSchema).get_debugging(@category varchar(50))
 returns bit
 as
@@ -99,6 +112,73 @@ returns nvarchar(max)
 as
 begin
     return isnull(N'''' + @value + N'''', N'NULL');
+end
+go
+
+create or alter proc $(AssertSchema)._collate_equals
+(
+    @a         nvarchar(max),
+    @b         nvarchar(max),
+    @collation sysname,
+    @equals    bit,
+    @msg       $(AssertSchema).assert_message out
+)
+as
+begin
+    set nocount on;
+
+    if @equals is null
+        raiserror('$(AssertSchema)._collate_equals: @equals parameter is required', 16, 1)
+    
+    if @a is null and @b is null
+        set @msg = case when @equals = 1 then null else N'NULL is equal to NULL' end;
+    else
+    if @a is null or @b is null
+        set @msg = case when @equals = 0 then null else $(AssertSchema)._quote(@a) + N' is' +
+                        (case when @equals = 1 then ' not ' else ' ' end) +
+                        + 'equal to ' +
+                        $(AssertSchema)._quote(@b)
+                    end;
+    else
+    if @collation is null
+        set @msg = N'@collation parameter is required';
+    else
+    if not exists (select 1 from sys.fn_helpcollations() where name = @collation)
+        set @msg = N'collation ' + $(AssertSchema)._quote(@collation) + N' not found';
+    else
+    begin
+        declare @query nvarchar(max) =
+            N'begin try
+                set @msg =
+                    case when @a collate ' + @collation + N' ' + (case when @equals = 1 then '=' else '<>' end) + ' @b collate ' + @collation
+            + N' then null else ''error'' end
+              end try
+              begin catch
+                if $(AssertSchema).is_debugging(''errors,e'') = 1
+                    print error_message()
+
+                set @msg = ''collation equality check failed ('' + error_message() + '')''
+              end catch
+            ';
+        
+        if $(AssertSchema).is_debugging('query,q') = 1
+            print @query
+
+        exec sp_executesql @query,
+            N'  @a nvarchar(max),
+                @b nvarchar(max),
+                @msg $(AssertSchema).assert_message out',
+                @a, @b, @msg out;
+
+        if @msg is not null
+            set @msg = $(AssertSchema)._quote(@a) +
+                        ' is ' +
+                        (case when @equals = 1 then 'not' else '' end) +
+                        ' equal to ' +
+                        $(AssertSchema)._quote(@b) +
+                        N' under collation ' +
+                        @collation;
+    end
 end
 go
 
@@ -459,67 +539,6 @@ begin
 end
 go
 
--- =============================================
--- $(AssertSchema).CollateEquals
--- =============================================
--- Asserts that two values are equal under an explicit collation.
--- The collation name is inserted into the comparison via dynamic SQL;
--- an invalid collation name causes the assertion to fail with a
--- parse error from the dynamic statement.
---
--- Examples:
---   exec $(AssertSchema).CollateEquals N'Hello', N'hello', 'Latin1_General_CS_AS';
---   exec $(AssertSchema).CollateEquals N'e',     N'é',     'Latin1_General_CI_AI';
--- =============================================
-create or alter proc $(AssertSchema).CollateEquals
-(
-    @a         sql_variant,
-    @b         sql_variant,
-    @collation sysname,
-    @label     $(AssertSchema).label = null
-)
-as
-begin
-    set nocount on;
-
-    print 'SSTR_ASSERTION';
-
-    if @a is null and @b is null return;
-
-    declare @sp sysname = object_name(@@procid)
-    declare @msg $(AssertSchema).assert_message
-    declare @should_raise bit = 1
-    declare @sa nvarchar(max) = convert(nvarchar(max), @a);
-    declare @sb nvarchar(max) = convert(nvarchar(max), @b);
-
-    if @a is null or @b is null
-        set @msg =    $(AssertSchema)._quote(@sa)
-                    + N' is not equal to '
-                    + $(AssertSchema)._quote(@sb);
-    else
-    if @collation is null
-        set @msg = N'@collation parameter is required';
-    else
-    if not exists (select 1 from sys.fn_helpcollations() where name = @collation)
-        set @msg = N'collation ' + $(AssertSchema)._quote(@collation) + N' not found';
-    else
-    begin
-        declare @query nvarchar(max) =
-            N'set @should_raise =
-                case when @sa collate ' + @collation + N' = @sb collate ' + @collation
-            + N' then 0 else 1 end';
-        exec sp_executesql
-            @query,
-            N'@sa nvarchar(max), @sb nvarchar(max), @should_raise bit out',
-            @sa, @sb, @should_raise out;
-
-        set @msg = $(AssertSchema)._quote(@sa) + ' is not equal to ' + $(AssertSchema)._quote(@sb) + N' under collation ' + @collation;
-    end
-
-    exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
-end
-go
-
 -- case-sensitive, accent-sensitive, trailing-space-insensitive comparison
 create or alter proc $(AssertSchema).EqualsOrdinal
 (
@@ -763,6 +782,46 @@ begin
 end
 go
 
+-- =============================================
+-- $(AssertSchema).CollateEquals
+-- =============================================
+-- Asserts that two values are equal under an explicit collation.
+-- The collation name is inserted into the comparison via dynamic SQL;
+-- an invalid collation name causes the assertion to fail with a
+-- parse error from the dynamic statement.
+--
+-- Examples:
+--   exec $(AssertSchema).CollateEquals N'Hello', N'hello', 'Latin1_General_CS_AS';
+--   exec $(AssertSchema).CollateEquals N'e',     N'é',     'Latin1_General_CI_AI';
+-- =============================================
+create or alter proc $(AssertSchema).CollateEquals
+(
+    @a         sql_variant,
+    @b         sql_variant,
+    @collation sysname,
+    @label     $(AssertSchema).label = null
+)
+as
+begin
+    set nocount on;
+
+    print 'SSTR_ASSERTION';
+
+    declare @sp sysname = object_name(@@procid)
+    declare @msg $(AssertSchema).assert_message
+    declare @should_raise bit = 1
+    declare @sa nvarchar(max) = convert(nvarchar(max), @a);
+    declare @sb nvarchar(max) = convert(nvarchar(max), @b);
+
+    exec $(AssertSchema)._collate_equals @sa, @sb, @collation, 1, @msg out
+
+    if @msg is null
+        set @should_raise = 0
+
+    exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
+end
+go
+
 create or alter proc $(AssertSchema).CollateNotEquals
 (
     @a         sql_variant,
@@ -779,52 +838,13 @@ begin
     declare @sp sysname = object_name(@@procid)
     declare @msg $(AssertSchema).assert_message
     declare @should_raise bit = 1
-
     declare @sa nvarchar(max) = convert(nvarchar(max), @a);
     declare @sb nvarchar(max) = convert(nvarchar(max), @b);
 
-    if @a is null and @b is null
-    begin
-        set @msg = N'both values are null';
-        exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
-        return;
-    end
+    exec $(AssertSchema)._collate_equals @sa, @sb, @collation, 0, @msg out
 
-    if @a is null or @b is null
-    begin
-        -- exactly one null -> pass
-        set @should_raise = 0;
-        set @msg = N'';
-        exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
-        return;
-    end
-
-    if @collation is null
-    begin
-        set @msg = N'@collation parameter is required';
-        exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
-        return;
-    end
-
-    if not exists (select 1 from sys.fn_helpcollations() where name = @collation)
-    begin
-        set @msg = N'collation ' + $(AssertSchema)._quote(@collation) + N' not found';
-        exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
-        return;
-    end
-
-    declare @query nvarchar(max) =
-        N'set @should_raise =
-            case when @sa collate ' + @collation + N' = @sb collate ' + @collation
-        + N' then 1 else 0 end';
-    exec sp_executesql
-        @query,
-        N'@sa nvarchar(max), @sb nvarchar(max), @should_raise bit out',
-        @sa, @sb, @should_raise out;
-
-    if @should_raise = 1
-        set @msg = $(AssertSchema)._quote(@sa) + N' is equal to ' + $(AssertSchema)._quote(@sb)
-                 + N' under collation ' + @collation;
+    if @msg is null
+        set @should_raise = 0
 
     exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
 end
@@ -843,45 +863,14 @@ begin
 
     print 'SSTR_ASSERTION';
 
-    if @a is null and @b is null return;
-
     declare @sp sysname = object_name(@@procid)
     declare @msg $(AssertSchema).assert_message
     declare @should_raise bit = 1
 
-    if @a is null or @b is null
-    begin
-        set @msg = $(AssertSchema)._quote(@a) + N' is not equal to ' + $(AssertSchema)._quote(@b);
-        exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
-        return;
-    end
+    exec $(AssertSchema)._collate_equals @a, @b, @collation, 1, @msg out
 
-    if @collation is null
-    begin
-        set @msg = N'@collation parameter is required';
-        exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
-        return;
-    end
-
-    if not exists (select 1 from sys.fn_helpcollations() where name = @collation)
-    begin
-        set @msg = N'collation ' + $(AssertSchema)._quote(@collation) + N' not found';
-        exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
-        return;
-    end
-
-    declare @query nvarchar(max) =
-        N'set @should_raise =
-            case when @a collate ' + @collation + N' = @b collate ' + @collation
-        + N' then 0 else 1 end';
-    exec sp_executesql
-        @query,
-        N'@a nvarchar(max), @b nvarchar(max), @should_raise bit out',
-        @a, @b, @should_raise out;
-
-    if @should_raise = 1
-        set @msg = $(AssertSchema)._quote(@a) + N' is not equal to ' + $(AssertSchema)._quote(@b)
-                 + N' under collation ' + @collation;
+    if @msg is null
+        set @should_raise = 0
 
     exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
 end
@@ -904,47 +893,10 @@ begin
     declare @msg $(AssertSchema).assert_message
     declare @should_raise bit = 1
 
-    if @a is null and @b is null
-    begin
-        set @msg = N'both values are null';
-        exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
-        return;
-    end
+    exec $(AssertSchema)._collate_equals @a, @b, @collation, 0, @msg out
 
-    if @a is null or @b is null
-    begin
-        set @should_raise = 0;
-        set @msg = N'';
-        exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
-        return;
-    end
-
-    if @collation is null
-    begin
-        set @msg = N'@collation parameter is required';
-        exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
-        return;
-    end
-
-    if not exists (select 1 from sys.fn_helpcollations() where name = @collation)
-    begin
-        set @msg = N'collation ' + $(AssertSchema)._quote(@collation) + N' not found';
-        exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
-        return;
-    end
-
-    declare @query nvarchar(max) =
-        N'set @should_raise =
-            case when @a collate ' + @collation + N' = @b collate ' + @collation
-        + N' then 1 else 0 end';
-    exec sp_executesql
-        @query,
-        N'@a nvarchar(max), @b nvarchar(max), @should_raise bit out',
-        @a, @b, @should_raise out;
-
-    if @should_raise = 1
-        set @msg = $(AssertSchema)._quote(@a) + N' is equal to ' + $(AssertSchema)._quote(@b)
-                 + N' under collation ' + @collation;
+    if @msg is null
+        set @should_raise = 0
 
     exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
 end

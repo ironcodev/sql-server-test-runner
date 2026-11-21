@@ -11,55 +11,24 @@ import { readTextFile } from "../src/file-utils.js";
 
 const sqlcmdCalls = [];
 
+const fakeRunSqlcmd = async (args, options) => {
+  sqlcmdCalls.push({ args, options });
+  const iIndex = args.indexOf("-i");
+  if (iIndex !== -1) {
+    const filePath = args[iIndex + 1] || "";
+    let content = "";
+    try { content = await readTextFile(filePath); } catch { /* ignore */ }
+    if (content.includes("FAIL_ME")) {
+      return { code: 1, stdout: "", stderr: "Msg 50000, Level 16, State 1, Server x, Line 1" };
+    }
+    return { code: 0, stdout: "", stderr: "" };
+  }
+  return { code: 0, stdout: "1", stderr: "" };
+};
+
 mock.module("../src/sqlcmd.js", {
   exports: {
-    runSqlcmd: async (args) => {
-      sqlcmdCalls.push(args);
-
-      // -i <file> call: read the file and decide based on its content.
-      const iIndex = args.indexOf("-i");
-      if (iIndex !== -1) {
-        const filePath = args[iIndex + 1];
-        let content = "";
-        try {
-          content = await readTextFile(filePath);
-        } catch {
-          content = "";
-        }
-        if (content.includes("FAIL_ME")) {
-          return {
-            code: 1,
-            stdout: "",
-            stderr: "Msg 50000, Level 16, State 1, Server x, Line 1",
-          };
-        }
-        return { code: 0, stdout: "", stderr: "" };
-      }
-
-      // -Q <sql> call.
-      const qIndex = args.indexOf("-Q");
-      if (qIndex !== -1) {
-        const sql = args[qIndex + 1] || "";
-        if (sql.includes("FAIL_ME")) {
-          return {
-            code: 1,
-            stdout: "",
-            stderr: "Msg 50000, Level 16, State 1, Server x, Line 1",
-          };
-        }
-        const throwMatch = sql.match(/THROW_(\d+)/);
-        if (throwMatch) {
-          return {
-            code: 1,
-            stdout: "",
-            stderr: `Msg ${throwMatch[1]}, Level 16, State 1, Server x, Line 1`,
-          };
-        }
-        return { code: 0, stdout: "1", stderr: "" };
-      }
-
-      return { code: 0, stdout: "1", stderr: "" };
-    },
+    runSqlcmd: fakeRunSqlcmd,
     buildConnectionArgs: (cfg, { database } = {}) => {
       const args = ["-S", cfg.connection?.server ?? "localhost", "-b"];
       if (database) args.push("-d", database);
@@ -75,12 +44,10 @@ mock.module("../src/sqlcmd.js", {
 mock.module("../src/database.js", {
   exports: {
     checkConnection: async () => {},
-    databaseExists: async (_cfg, dbName) =>
-      String(dbName).startsWith("existing_"),
+    databaseExists: async (_cfg, dbName) => String(dbName).startsWith("existing_"),
     createDatabase: async () => {},
     dropDatabase: async () => {},
-    backupAndRestore: async (_cfg, source, target) =>
-      `/tmp/sstr_${source}_${target}.bak`,
+    backupAndRestore: async (_cfg, source, target) => `/tmp/sstr_${source}_${target}.bak`,
     listSstrDatabases: async () => [],
     listStoredProcedures: async () => globalThis.__testProcedures ?? [],
     executeTestProcedure: async (_cfg, _db, fullName) => {
@@ -113,6 +80,7 @@ const { run } = await import("../src/runner.js");
 function baseConfig(overrides = {}) {
   return {
     connection: { server: "localhost", trustedConnection: true },
+    runSqlcmd: fakeRunSqlcmd,
     testMatch: "^test_",
     assertSchema: "Assert",
     testRegex: "\\.test\\.sql$",
@@ -201,16 +169,12 @@ describe("run", () => {
     const cfg = baseConfig({ testDb: "sstr_runner_skip" });
     const reporter = await run(cfg, { cwd: root });
 
-    const skipped = reporter.results.find(
-      (r) => r.procedure === "dbo.test_skipped",
-    );
+    const skipped = reporter.results.find((r) => r.procedure === "dbo.test_skipped");
     assert.ok(skipped);
     assert.equal(skipped.skipped, true);
     assert.equal(skipped.passed, true);
 
-    const passed = reporter.results.find(
-      (r) => r.procedure === "dbo.test_pass",
-    );
+    const passed = reporter.results.find((r) => r.procedure === "dbo.test_pass");
     assert.ok(passed);
     assert.equal(passed.skipped, false);
     assert.equal(passed.passed, true);
@@ -276,11 +240,7 @@ describe("run", () => {
 
   test("bail stops after the first failure", async () => {
     await resetRoot();
-    globalThis.__testProcedures = [
-      "dbo.test_fail",
-      "dbo.test_pass",
-      "dbo.test_pass2",
-    ];
+    globalThis.__testProcedures = ["dbo.test_fail", "dbo.test_pass", "dbo.test_pass2"];
     await writeTestFile("sum.test.sql", "select 1");
 
     const cfg = baseConfig({ testDb: "sstr_runner_bail" });
@@ -314,10 +274,7 @@ describe("run", () => {
     await writeFile(join(root, "sum.test.json"), "{ invalid", "utf-8");
 
     const cfg = baseConfig({ testDb: "sstr_runner_invalidjson" });
-    await assert.rejects(
-      () => run(cfg, { cwd: root }),
-      /Invalid JSON in ".*sum\.test\.json"/,
-    );
+    await assert.rejects(() => run(cfg, { cwd: root }), /Invalid JSON in ".*sum\.test\.json"/);
   });
 
   test("uses testSchema to include non-prefixed procedures", async () => {

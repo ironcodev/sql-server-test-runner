@@ -9,10 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.2.0] - 2026-11-19
 
-- **Breaking:** the default `testRegex` now matches only `.test.sql` and `.spec.sql`
-  files under `tests/` (previously it matched every `.sql` file under `tests/`).
-  If your test files use a different naming convention, set `testRegex` explicitly
-  in `sstr.config.json`.
+- **Breaking:** the default `testRegex` now matches only files under `<cwd>/tests`
+  whose names end with `.test.sql` or `.spec.sql`
+  (`"^tests/.*\\.(test|spec)\\.sql$"`). Previously it matched every `.sql` file
+  under `tests/`. To restore the old behavior, set
+  `"testRegex": "tests/.*\\.sql$"` in `sstr.config.json`.
+- `discoverTestFiles` no longer gates the walk behind the existence of
+  `<cwd>/tests`; the default regex enforces the layout instead.
 - **Unit Tests** added unit tests.
 - **More equality assertions** added new equality assertions `EqualsOrdinal`, `CollateEquals`,
 `BinaryEquals`, `CollateMaxEquals` together with the their `Not` assertions.

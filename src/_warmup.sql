@@ -11,15 +11,18 @@ begin
     set nocount on
 
     begin try
-        if Assert.is_debugging('vars') = 1
+        if $(AssertSchema).is_debugging('vars,v') = 1
         begin
             print concat('@a: ', isnull(convert(nvarchar(max), @a), 'NULL'))
             print concat('@b: ', isnull(convert(nvarchar(max), @b), 'NULL'))
             print concat('expected: ', @expect)
         end
 
-        declare @query nvarchar(1000) =
-            'exec Assert.[' + @operator + '] @a, @b, @label'
+        declare @query nvarchar(1000) = N'
+exec $(AssertSchema).[' + @operator + '] @a, @b, @label'
+
+        if $(AssertSchema).is_debugging('query,q') = 1
+            print @query
 
         if @operator in ('BinaryEquals', 'BinaryNotEquals',
                          'MaxEquals', 'MaxNotEquals',
@@ -47,7 +50,7 @@ begin
 
         if @expect = 0
         begin
-            if Assert.is_debugging('result') = 1
+            if $(AssertSchema).is_debugging('result,r') = 1
             begin
                 print ''
                 print concat(@label, ': failed')
@@ -55,23 +58,23 @@ begin
             raiserror('Equals failed', 16, 1)
         end
         else
-        if Assert.is_debugging('result') = 1
+        if $(AssertSchema).is_debugging('result,r') = 1
             print concat(@label, ': passed')
     end try
     begin catch
         if @expect = 1
         begin
-            if Assert.is_debugging('result') = 1
+            if $(AssertSchema).is_debugging('result,r') = 1
                 print concat(@label, ': failed');
-            if Assert.is_debugging('errors') = 1
+            if $(AssertSchema).is_debugging('errors') = 1
                 print error_message();
             throw;
         end
         else
         begin
-            if Assert.is_debugging('result') = 1
+            if $(AssertSchema).is_debugging('result,r') = 1
                 print concat(@label, ': passed');
-            exec Assert.IsTrue 1, @label;
+            exec $(AssertSchema).IsTrue 1, @label;
         end
     end catch
 end
@@ -91,16 +94,20 @@ begin
     set nocount on;
 
     begin try
-        if Assert.is_debugging('vars') = 1
+        if $(AssertSchema).is_debugging('vars,v') = 1
         begin
             print concat('@a: ', isnull(convert(nvarchar(max), @a), 'NULL'))
             print concat('@b: ', isnull(convert(nvarchar(max), @b), 'NULL'))
             print concat('@collation: ', @collation)
             print concat('expected: ', @expect)
+            print ''
         end
 
-        declare @query nvarchar(1000) =
-            'exec Assert.[' + @operator + '] @a, @b, @collation, @label'
+        declare @query nvarchar(1000) = N'
+exec $(AssertSchema).[' + @operator + '] @a, @b, @collation, @label'
+
+        if $(AssertSchema).is_debugging('query,q') = 1
+            print @query
 
         if @operator like 'CollateMax%'
         begin
@@ -126,7 +133,7 @@ begin
 
         if @expect = 0
         begin
-            if Assert.is_debugging('result') = 1
+            if $(AssertSchema).is_debugging('result,r') = 1
             begin
                 print ''
                 print concat(@label, ': failed')
@@ -134,23 +141,23 @@ begin
             raiserror('Equals failed', 16, 1)
         end
         else
-        if Assert.is_debugging('result') = 1
+        if $(AssertSchema).is_debugging('result,r') = 1
             print concat(@label, ': passed')
     end try
     begin catch
         if @expect = 1
         begin
-            if Assert.is_debugging('result') = 1
+            if $(AssertSchema).is_debugging('result,r') = 1
                 print concat(@label, ': failed');
-            if Assert.is_debugging('errors') = 1
+            if $(AssertSchema).is_debugging('errors') = 1
                 print error_message();
             throw;
         end
         else
         begin
-            if Assert.is_debugging('result') = 1
+            if $(AssertSchema).is_debugging('result,r') = 1
                 print concat(@label, ': passed');
-            exec Assert.IsTrue 1, @label;
+            exec $(AssertSchema).IsTrue 1, @label;
         end
     end catch
 end
@@ -168,8 +175,12 @@ begin
     set nocount on;
 
     begin try
-        declare @query nvarchar(1000) =
-            'exec Assert.[' + @operator + '] @a, @label'
+        declare @query nvarchar(1000) = N'
+exec $(AssertSchema).[' + @operator + '] @a, @label'
+
+        if $(AssertSchema).is_debugging('query,q') = 1
+            print @query
+
         exec sp_executesql @query,
             N'@a sql_variant, @label nvarchar(500)',
             @a = @a, @label = @label
@@ -180,7 +191,7 @@ begin
     begin catch
         if @expect = 1
             throw;
-        exec Assert.IsTrue 1, @label;
+        exec $(AssertSchema).IsTrue 1, @label;
     end catch
 end
 go
@@ -199,8 +210,12 @@ begin
     set nocount on;
 
     begin try
-        declare @query nvarchar(1000) =
-            'exec Assert.[' + @operator + '] @a, @from, @to, @label'
+        declare @query nvarchar(1000) = N'
+exec $(AssertSchema).[' + @operator + '] @a, @from, @to, @label'
+
+        if $(AssertSchema).is_debugging('query,q') = 1
+            print @query
+
         exec sp_executesql @query,
             N'@a sql_variant, @from sql_variant, @to sql_variant, @label nvarchar(500)',
             @a = @a, @from = @from, @to = @to, @label = @label
@@ -211,7 +226,7 @@ begin
     begin catch
         if @expect = 1
             throw;
-        exec Assert.IsTrue 1, @label;
+        exec $(AssertSchema).IsTrue 1, @label;
     end catch
 end
 go

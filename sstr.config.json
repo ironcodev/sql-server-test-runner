@@ -3,7 +3,7 @@
     "server": "localhost",
     "trustedConnection": true
   },
-  "testRegex": "tests/.*\\.(test|spec)\\.sql$",
+  "testRegex": "^tests/.*\\.(test|spec)\\.sql$",
   "scripts": {
     "warmUp": "src/_warmup.sql",
     "coolDown": "src/_cooldown.sql"

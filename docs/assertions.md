@@ -58,20 +58,20 @@ These comparisons cast to `float`.
 
 | Procedure | Signature | Fails when |
 |---|---|---|
-| `Equals` | `@a, @b sql_variant` | the two values are equal. Two `NULL`s are considered equal. **Limited to values up to 4000 characters** (a `sql_variant` restriction); use `MaxEquals` for longer strings. |
-| `NotEquals` | `@a, @b sql_variant` | the two values are not equal. Two `NULL`s fail. **Limited to values up to 4000 characters**; use `MaxNotEquals` for longer strings. |
-| `MaxEquals` | `@a, @b nvarchar(max)` | the two values are equal. Two `NULL`s are considered equal. Use this for values longer than 4000 characters. |
-| `MaxNotEquals` | `@a, @b nvarchar(max)` | the two values are not equal. Two `NULL`s fail. Use this for values longer than 4000 characters. |
-| `CollateEquals` | `@a, @b sql_variant, @collation sysname` | the two values are equal under the given collation. Two `NULL`s are considered equal. The collation name must exist on the server; an invalid name fails the assertion. Limited to 4000 characters; use `CollateMaxEquals` for longer strings. |
-| `CollateNotEquals` | `@a, @b sql_variant, @collation sysname` | the two values are not equal under the given collation. Two `NULL`s fail. Same collation and length caveats. |
-| `CollateMaxEquals` | `@a, @b nvarchar(max), @collation sysname` | the two values are equal under the given collation. Two `NULL`s are considered equal. Use this for values longer than 4000 characters. |
-| `CollateMaxNotEquals` | `@a, @b nvarchar(max), @collation sysname` | the two values are not equal under the given collation. Two `NULL`s fail. Use this for values longer than 4000 characters. |
-| `EqualsOrdinal` | `@a, @b sql_variant` | the two values are equal under `Latin1_General_100_BIN2`. Case-sensitive and accent-sensitive. **Trailing spaces are ignored** (ANSI padding). Two `NULL`s are considered equal. Limited to 4000 characters; use `MaxEqualsOrdinal` for longer strings. |
-| `NotEqualsOrdinal` | `@a, @b sql_variant` | the two values are not equal under `Latin1_General_100_BIN2`. Same case, accent, and padding behaviour. Two `NULL`s fail. Limited to 4000 characters; use `MaxNotEqualsOrdinal` for longer strings. |
-| `MaxEqualsOrdinal` | `@a, @b nvarchar(max)` | the two values are equal under `Latin1_General_100_BIN2`. Case-sensitive, accent-sensitive, trailing spaces ignored. Two `NULL`s are considered equal. Use this for values longer than 4000 characters. |
-| `MaxNotEqualsOrdinal` | `@a, @b nvarchar(max)` | the two values are not equal under `Latin1_General_100_BIN2`. Same behaviour. Two `NULL`s fail. Use this for values longer than 4000 characters. |
-| `BinaryEquals` | `@a, @b nvarchar(max)` | the two values are **byte-identical** (`varbinary` comparison). Case-sensitive, accent-sensitive, and **trailing spaces are significant**. Two `NULL`s are considered equal. No `sql_variant` variant: byte identity is undefined for non-string types. |
-| `BinaryNotEquals` | `@a, @b nvarchar(max)` | the two values are **not byte-identical**. Same behaviour. Two `NULL`s fail. No `sql_variant` variant. |
+| `Equals` | `@a, @b sql_variant` | the two values are **not** equal. Two `NULL`s are considered equal. **Limited to values up to 4000 characters** (a `sql_variant` restriction); use `MaxEquals` for longer strings. |
+| `NotEquals` | `@a, @b sql_variant` | the two values **are** equal. Two `NULL`s fail. **Limited to values up to 4000 characters**; use `MaxNotEquals` for longer strings. |
+| `MaxEquals` | `@a, @b nvarchar(max)` | the two values are **not** equal. Two `NULL`s are considered equal. Use this for values longer than 4000 characters. |
+| `MaxNotEquals` | `@a, @b nvarchar(max)` | the two values **are** equal. Two `NULL`s fail. Use this for values longer than 4000 characters. |
+| `CollateEquals` | `@a, @b sql_variant, @collation sysname` | the two values are **not** equal under the given collation. Two `NULL`s are considered equal. The collation name must exist on the server; an invalid name fails the assertion. Limited to 4000 characters; use `CollateMaxEquals` for longer strings. |
+| `CollateNotEquals` | `@a, @b sql_variant, @collation sysname` | the two values **are** equal under the given collation. Two `NULL`s fail. Same collation and length caveats. |
+| `CollateMaxEquals` | `@a, @b nvarchar(max), @collation sysname` | the two values are **not** equal under the given collation. Two `NULL`s are considered equal. Use this for values longer than 4000 characters. |
+| `CollateMaxNotEquals` | `@a, @b nvarchar(max), @collation sysname` | the two values **are** equal under the given collation. Two `NULL`s fail. Use this for values longer than 4000 characters. |
+| `EqualsOrdinal` | `@a, @b sql_variant` | the two values are **not** equal under `Latin1_General_100_BIN2`. Case-sensitive and accent-sensitive. **Trailing spaces are ignored** (ANSI padding). Two `NULL`s are considered equal. Limited to 4000 characters; use `MaxEqualsOrdinal` for longer strings. |
+| `NotEqualsOrdinal` | `@a, @b sql_variant` | the two values **are** equal under `Latin1_General_100_BIN2`. Same case, accent, and padding behaviour. Two `NULL`s fail. Limited to 4000 characters; use `MaxNotEqualsOrdinal` for longer strings. |
+| `MaxEqualsOrdinal` | `@a, @b nvarchar(max)` | the two values are **not** equal under `Latin1_General_100_BIN2`. Case-sensitive, accent-sensitive, trailing spaces ignored. Two `NULL`s are considered equal. Use this for values longer than 4000 characters. |
+| `MaxNotEqualsOrdinal` | `@a, @b nvarchar(max)` | the two values **are** equal under `Latin1_General_100_BIN2`. Same behaviour. Two `NULL`s fail. Use this for values longer than 4000 characters. |
+| `BinaryEquals` | `@a, @b nvarchar(max)` | the two values are **not** **byte-identical** (`varbinary` comparison). Case-sensitive, accent-sensitive, and **trailing spaces are significant**. Two `NULL`s are considered equal. No `sql_variant` variant: byte identity is undefined for non-string types. |
+| `BinaryNotEquals` | `@a, @b nvarchar(max)` | the two values **are** **byte-identical**. Same behaviour. Two `NULL`s fail. No `sql_variant` variant. |
 
 `Equals` and `NotEquals` compare values as strings.
 

@@ -1,17 +1,23 @@
 import { readdir } from "fs/promises";
 import { join, relative } from "path";
 
-const DEFAULT_TEST_REGEX = "tests/.*\\.(test|spec)\\.sql$";
+// Matches only files under <cwd>/tests whose name ends with `.test.sql` or `.spec.sql`.
+// The leading `^tests/` anchors the match to the start of the relative path, so
+// `examples/tests/foo.test.sql` is NOT matched (its relative path starts with
+// `examples/`, not `tests/`).
+const DEFAULT_TEST_REGEX = "^tests/.*\\.(test|spec)\\.sql$";
 
 /**
  * Walks cwd and returns all .sql files whose relative path matches testRegex.
+ *
+ * The walk covers the whole `cwd` tree (minus a few ignored directories), but
+ * the default regex restricts matches to files under `tests/`. Users who want
+ * a different layout can override `testRegex` in `sstr.config.json`.
  */
 export async function discoverTestFiles(cwd, testRegex) {
   const regexStr = testRegex || DEFAULT_TEST_REGEX;
   const regex = new RegExp(regexStr, "i");
   const results = [];
-
-  const testsDir = join(cwd, "tests");
 
   async function walk(dir) {
     const entries = await readdir(dir, { withFileTypes: true });
@@ -31,15 +37,7 @@ export async function discoverTestFiles(cwd, testRegex) {
     }
   }
 
-  try {
-    const stat = await import("node:fs/promises").then((m) => m.stat(testsDir));
-    if (stat.isDirectory()) {
-      await walk(testsDir);
-    }
-  } catch {
-    // tests/ does not exist; return empty
-  }
-
+  await walk(cwd);
   results.sort();
   return results;
 }
