@@ -1,0 +1,82 @@
+{
+  "files": {
+    "BinaryEquals": {
+      "skip": false
+    },
+    "BinaryNotEquals": {
+      "skip": false
+    },
+    "CollateEquals": {
+      "skip": false
+    },
+    "CollateMaxEquals": {
+      "skip": false
+    },
+    "CollateMaxNotEquals": {
+      "skip": false
+    },
+    "CollateNotEquals": {
+      "skip": false
+    },
+    "Equals": {
+      "skip": false
+    },
+    "EqualsOrdinal": {
+      "skip": false
+    },
+    "MaxEquals": {
+      "skip": false
+    },
+    "MaxEqualsOrdinal": {
+      "skip": false
+    },
+    "MaxNotEquals": {
+      "skip": false
+    },
+    "MaxNotEqualsOrdinal": {
+      "skip": false
+    },
+    "NotEquals": {
+      "skip": false
+    },
+    "NotEqualsOrdinal": {
+      "skip": false
+    },
+    "IsEmpty": {
+      "skip": false
+    },
+    "IsFalse": {
+      "skip": false
+    },
+    "IsNotNull": {
+      "skip": false
+    },
+    "IsNull": {
+      "skip": false
+    },
+    "IsNumeric": {
+      "skip": false
+    },
+    "IsTrue": {
+      "skip": false
+    },
+    "IsBetween": {
+      "skip": false
+    },
+    "IsGT": {
+      "skip": false
+    },
+    "IsGTE": {
+      "skip": false
+    },
+    "IsLT": {
+      "skip": false
+    },
+    "IsLTE": {
+      "skip": false
+    },
+    "NotBetween": {
+      "skip": false
+    }
+  }
+}

@@ -41,14 +41,10 @@ All parameters are `sql_variant` so you can pass native values (`int`, `decimal`
 | `IsNumeric` | `@a` | `@a` is null or cannot be cast to `float`. |
 | `IsEmpty` | `@a` | `@a` is null or not an empty string. |
 
-### Equality and comparison
+### comparison
 
 | Procedure | Signature | Fails when |
 |---|---|---|
-| `Equals` | `@a, @b sql_variant` | the two values are equal. Two `NULL`s are considered equal. **Limited to values up to 4000 characters** (a `sql_variant` restriction); use `MaxEquals` for longer strings. |
-| `NotEquals` | `@a, @b sql_variant` | the two values are not equal. Two `NULL`s fail. **Limited to values up to 4000 characters**; use `MaxNotEquals` for longer strings. |
-| `MaxEquals` | `@a, @b nvarchar(max)` | the two values are equal. Two `NULL`s are considered equal. Use this for values longer than 4000 characters. |
-| `MaxNotEquals` | `@a, @b nvarchar(max)` | the two values are not equal. Two `NULL`s fail. Use this for values longer than 4000 characters. |
 | `IsGT` | `@a, @b` | `@a` is not greater than `@b`. |
 | `IsGTE` | `@a, @b` | `@a` is not greater than or equal to `@b`. |
 | `IsLT` | `@a, @b` | `@a` is not less than `@b`. |
@@ -56,18 +52,52 @@ All parameters are `sql_variant` so you can pass native values (`int`, `decimal`
 | `IsBetween` | `@a, @from, @to` | `@a` is not between `@from` and `@to`. |
 | `NotBetween` | `@a, @from, @to` | `@a` is between `@from` and `@to`. |
 
-`Equals` and `NotEquals` compare values as strings. Numeric comparisons (`IsGT`, `IsBetween`, …) cast to `float`.
+These comparisons cast to `float`.
 
-> **`sql_variant` and the 4000-character limit.** `Equals` and `NotEquals` accept
-> `sql_variant`, which can hold any SQL Server type but caps `nvarchar`/`varchar`
-> values at 4000 characters and fail with a truncation error for large strings.
-> If your value may be longer, use `MaxEquals` /
-> `MaxNotEquals`, which accept `nvarchar(max)` directly. Most types (integers,
-> decimals, dates, strings) convert to `nvarchar(max)` implicitly; types that do
-> not (e.g. `varbinary`, `xml`, `sql_variant`) must be cast explicitly:
-> ```sql
-> exec Assert.MaxEquals cast(@a as nvarchar(max)), cast(@b as nvarchar(max));
-> ```
+### Equality
+
+| Procedure | Signature | Fails when |
+|---|---|---|
+| `Equals` | `@a, @b sql_variant` | the two values are equal. Two `NULL`s are considered equal. **Limited to values up to 4000 characters** (a `sql_variant` restriction); use `MaxEquals` for longer strings. |
+| `NotEquals` | `@a, @b sql_variant` | the two values are not equal. Two `NULL`s fail. **Limited to values up to 4000 characters**; use `MaxNotEquals` for longer strings. |
+| `MaxEquals` | `@a, @b nvarchar(max)` | the two values are equal. Two `NULL`s are considered equal. Use this for values longer than 4000 characters. |
+| `MaxNotEquals` | `@a, @b nvarchar(max)` | the two values are not equal. Two `NULL`s fail. Use this for values longer than 4000 characters. |
+| `CollateEquals` | `@a, @b sql_variant, @collation sysname` | the two values are equal under the given collation. Two `NULL`s are considered equal. The collation name must exist on the server; an invalid name fails the assertion. Limited to 4000 characters; use `CollateMaxEquals` for longer strings. |
+| `CollateNotEquals` | `@a, @b sql_variant, @collation sysname` | the two values are not equal under the given collation. Two `NULL`s fail. Same collation and length caveats. |
+| `CollateMaxEquals` | `@a, @b nvarchar(max), @collation sysname` | the two values are equal under the given collation. Two `NULL`s are considered equal. Use this for values longer than 4000 characters. |
+| `CollateMaxNotEquals` | `@a, @b nvarchar(max), @collation sysname` | the two values are not equal under the given collation. Two `NULL`s fail. Use this for values longer than 4000 characters. |
+| `EqualsOrdinal` | `@a, @b sql_variant` | the two values are equal under `Latin1_General_100_BIN2`. Case-sensitive and accent-sensitive. **Trailing spaces are ignored** (ANSI padding). Two `NULL`s are considered equal. Limited to 4000 characters; use `MaxEqualsOrdinal` for longer strings. |
+| `NotEqualsOrdinal` | `@a, @b sql_variant` | the two values are not equal under `Latin1_General_100_BIN2`. Same case, accent, and padding behaviour. Two `NULL`s fail. Limited to 4000 characters; use `MaxNotEqualsOrdinal` for longer strings. |
+| `MaxEqualsOrdinal` | `@a, @b nvarchar(max)` | the two values are equal under `Latin1_General_100_BIN2`. Case-sensitive, accent-sensitive, trailing spaces ignored. Two `NULL`s are considered equal. Use this for values longer than 4000 characters. |
+| `MaxNotEqualsOrdinal` | `@a, @b nvarchar(max)` | the two values are not equal under `Latin1_General_100_BIN2`. Same behaviour. Two `NULL`s fail. Use this for values longer than 4000 characters. |
+| `BinaryEquals` | `@a, @b nvarchar(max)` | the two values are **byte-identical** (`varbinary` comparison). Case-sensitive, accent-sensitive, and **trailing spaces are significant**. Two `NULL`s are considered equal. No `sql_variant` variant: byte identity is undefined for non-string types. |
+| `BinaryNotEquals` | `@a, @b nvarchar(max)` | the two values are **not byte-identical**. Same behaviour. Two `NULL`s fail. No `sql_variant` variant. |
+
+`Equals` and `NotEquals` compare values as strings.
+
+## Choosing a comparison
+
+The assertions differ on three axes: whether trailing spaces matter, whether the comparison is collation-driven, and whether the operands are limited to 4000 characters.
+
+|  | Trailing space significant? | Collation-driven? | Max length |
+|---|---|---|---|
+| `Equals` / `NotEquals` | no (padding) | database default | 4000 |
+| `EqualsOrdinal` / `NotEqualsOrdinal` | no (padding) | `BIN2` (binary) | 4000 |
+| `MaxEquals` / `MaxNotEquals` | no (padding) | database default | any |
+| `MaxEqualsOrdinal` / `MaxNotEqualsOrdinal` | no (padding) | `BIN2` (binary) | any |
+| `CollateEquals` / `CollateNotEquals` | no (padding) | caller-supplied | 4000 |
+| `CollateMaxEquals` / `CollateMaxNotEquals` | no (padding) | caller-supplied | any |
+| `BinaryEquals` / `BinaryNotEquals` | **yes** | none (byte-level) | any |
+
+Use `*Ordinal` when you need case- or accent-sensitive comparison but do not care about trailing spaces. Use `Binary*` when the exact byte sequence matters, including trailing spaces. Use `Collate*` when the comparison must follow a specific collation's rules (e.g. testing application logic that depends on a language-specific sort order).
+
+## `sql_variant` and the 4000-character limit
+
+`Equals` and `NotEquals` accept `sql_variant`, which can hold any SQL Server type but caps `nvarchar`/`varchar` values at 4000 characters and fail with a truncation error for large strings. If your value may be longer, use `MaxEquals` / `MaxNotEquals`, which accept `nvarchar(max)` directly. Most types (integers, decimals, dates, strings) convert to `nvarchar(max)` implicitly; types that do not (e.g. `varbinary`, `xml`, `sql_variant`) must be cast explicitly:
+
+```sql
+exec Assert.MaxEquals cast(@a as nvarchar(max)), cast(@b as nvarchar(max));
+```
 
 ## Examples
 
@@ -94,8 +124,8 @@ exec Assert.MaxEquals 3.14, 3.14;
 exec Assert.MaxEquals '2025-01-01', '2025-01-01';
 
 -- ✅ Works (large strings, the main use case)
-declare @a nvarchar(max) = replicate(N'x', 5000);
-declare @b nvarchar(max) = replicate(N'x', 5000);
+declare @a nvarchar(max) = replicate(cast(N'x' as nvarchar(max)), 5000)
+declare @b nvarchar(max) = replicate(cast(N'x' as nvarchar(max)), 5000)
 
 exec Assert.MaxEquals @a, @b;
 
@@ -110,6 +140,14 @@ declare @x xml = '<a/>';
 
 exec Assert.MaxEquals @x, @x;   -- error
 exec Assert.MaxEquals cast(@x as nvarchar(max)), cast(@x as nvarchar(max));  -- works
+
+-- Choosing a comparison
+-- Same values, four different questions:
+exec Assert.Equals         'Hello', 'hello';   -- pass under a CI collation
+exec Assert.EqualsOrdinal  'Hello', 'hello';   -- fail (case differs)
+exec Assert.BinaryEquals   'Hello', 'hello';   -- fail (bytes differ)
+exec Assert.BinaryEquals   'Hello', 'Hello ';  -- fail (trailing space is significant)
+exec Assert.EqualsOrdinal  'Hello', 'Hello ';  -- pass  (ANSI padding ignores trailing space)
 ```
 
 ## Limitations

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-19
+
+- **Breaking:** the default `testRegex` now matches only `.test.sql` and `.spec.sql`
+  files under `tests/` (previously it matched every `.sql` file under `tests/`).
+  If your test files use a different naming convention, set `testRegex` explicitly
+  in `sstr.config.json`.
+- **Unit Tests** added unit tests.
+- **More equality assertions** added new equality assertions `EqualsOrdinal`, `CollateEquals`,
+`BinaryEquals`, `CollateMaxEquals` together with the their `Not` assertions.
+- **Enhanced error reporting**
+  
 ## [2.1.1] - 2026-11-18
 
 ### Enhanced console reporter

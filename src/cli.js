@@ -348,7 +348,7 @@ const DEFAULT_CONFIG_JSON = `{
   "testDb": "sstr_testdb",
   "backupPath": "",
   "cleanupBackup": false,
-  "testRegex": "(tests/.*|(\\\\.|/)(test|spec))\\\\.sql$",
+  "testRegex": "tests/.*\\.(test|spec)\\.sql$",
   "testMatch": "^test_",
   "testSchema": "sstr",
   "assertSchema": "Assert",

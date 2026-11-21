@@ -1,7 +1,7 @@
 import { readdir } from "fs/promises";
 import { join, relative } from "path";
 
-const DEFAULT_TEST_REGEX = "(tests/.*|(\\.|/)(test|spec))\\.sql$";
+const DEFAULT_TEST_REGEX = "tests/.*\\.(test|spec)\\.sql$";
 
 /**
  * Walks cwd and returns all .sql files whose relative path matches testRegex.
@@ -11,15 +11,13 @@ export async function discoverTestFiles(cwd, testRegex) {
   const regex = new RegExp(regexStr, "i");
   const results = [];
 
+  const testsDir = join(cwd, "tests");
+
   async function walk(dir) {
     const entries = await readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
       if (entry.isDirectory()) {
-        if (
-          ["node_modules", ".git", "bin", "dist", "build", ".vs"].includes(
-            entry.name,
-          )
-        ) {
+        if (["node_modules", ".git", "bin", "dist", "build", ".vs"].includes(entry.name)) {
           continue;
         }
         await walk(join(dir, entry.name));
@@ -33,7 +31,15 @@ export async function discoverTestFiles(cwd, testRegex) {
     }
   }
 
-  await walk(cwd);
+  try {
+    const stat = await import("node:fs/promises").then((m) => m.stat(testsDir));
+    if (stat.isDirectory()) {
+      await walk(testsDir);
+    }
+  } catch {
+    // tests/ does not exist; return empty
+  }
+
   results.sort();
   return results;
 }

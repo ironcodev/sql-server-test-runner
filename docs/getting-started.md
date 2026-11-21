@@ -112,8 +112,7 @@ my-project/
 ```
 
 Test files are any `.sql` file whose **relative path** matches `testRegex`. The default regex matches:
-- anything under `tests/`,
-- any file ending with `.test.sql` or `.spec.sql`.
+- files under `tests/` that end with `.test.sql` or `.spec.sql`.
 
 ## 5. Write your first test
 

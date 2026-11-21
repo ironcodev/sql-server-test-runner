@@ -1,5 +1,38 @@
 import { makeColorizer } from "./util.js";
 
+/**
+ * Parses a sqlcmd error string into structured parts.
+ * Returns { header: { msg, level, state, server, procedure, line } | null,
+ *           body: string }.
+ * If the string does not match the standard format, header is null and
+ * body is the whole string.
+ */
+function parseSqlcmdError(text) {
+  const trimmed = (text || "").trim();
+  if (!trimmed) return { header: null, body: "" };
+
+  // Standard format:
+  //   Msg 50000, Level 16, State 1, Server X, Procedure Y, Line Z
+  //   <body>
+  // Server/Procedure/Line are optional in some messages.
+  const re =
+    /^Msg\s+(\d+),\s+Level\s+(\d+),\s+State\s+(\d+)(?:,\s+Server\s+([^,]+))?(?:,\s+Procedure\s+([^,]+))?(?:,\s+Line\s+(\d+))?\s*\r?\n([\s\S]*)$/i;
+  const m = trimmed.match(re);
+  if (!m) return { header: null, body: trimmed };
+
+  return {
+    header: {
+      msg: Number(m[1]),
+      level: Number(m[2]),
+      state: Number(m[3]),
+      server: m[4] ? m[4].trim() : null,
+      procedure: m[5] ? m[5].trim() : null,
+      line: m[6] ? Number(m[6]) : null,
+    },
+    body: (m[7] || "").trim(),
+  };
+}
+
 class BaseReporter {
   constructor({ color = true } = {}) {
     this.results = [];
@@ -17,15 +50,7 @@ class BaseReporter {
     this.runInfo = info;
   }
 
-  addResult({
-    file,
-    procedure,
-    passed,
-    error,
-    durationMs = null,
-    skipped = false,
-    warning = null,
-  }) {
+  addResult({ file, procedure, passed, error, durationMs = null, skipped = false, warning = null }) {
     this.results.push({
       file,
       procedure,
@@ -139,11 +164,24 @@ export class ConsoleReporter extends BaseReporter {
       console.log(c("red", "Failure details:"));
       for (const f of failures) {
         console.log(`  x file: ${f.file}`);
-        console.log(`      procedure: ${f.procedure}`);
+        console.log(`     procedure: ${c("yellow", f.procedure)}`);
         if (f.durationMs != null) {
-          console.log(`      duration:  ${f.durationMs} ms`);
+          console.log(`     duration: ${f.durationMs} ms`);
         }
-        console.log(`      error: ${(f.error || "").trim()}`);
+
+        const parsed = parseSqlcmdError(f.error);
+        if (parsed.header) {
+          const h = parsed.header;
+          console.log(`       Code: ${h.msg}, Level: ${h.level}, State: ${h.state}`);
+          // if (h.server) console.log(`       Server:    ${h.server}`);
+          // if (h.procedure) console.log(`       Procedure: ${h.procedure}`);
+          // if (h.line != null) console.log(`       Line:      ${h.line}`);
+          if (parsed.body) {
+            console.log(`       Message: ${c("red", parsed.body)}`);
+          }
+        } else {
+          console.log(`     ${(f.error || "").trim()}`);
+        }
         console.log("");
       }
     }
@@ -156,21 +194,15 @@ export class ConsoleReporter extends BaseReporter {
 
     console.log("----------------------------------------------");
     const passLabel = c("green", `pass: ${passed}`);
-    const failLabel =
-      failed > 0 ? c("red", `fail: ${failed}`) : c("gray", `fail: ${failed}`);
+    const failLabel = failed > 0 ? c("red", `fail: ${failed}`) : c("gray", `fail: ${failed}`);
     const skipLabel = skipped > 0 ? `, skipped: ${skipped}` : "";
-    const warnLabel =
-      warningCount > 0 ? c("yellow", `, warnings: ${warningCount}`) : "";
-    console.log(
-      `Tests: ${total}, ${passLabel}, ${failLabel}${skipLabel}${warnLabel}`,
-    );
+    const warnLabel = warningCount > 0 ? c("yellow", `, warnings: ${warningCount}`) : "";
+    console.log(`Tests: ${total}, ${passLabel}, ${failLabel}${skipLabel}${warnLabel}`);
 
     const withTime = this.results.filter((r) => r.durationMs != null);
     if (withTime.length > 0) {
       const totalMs = withTime.reduce((sum, r) => sum + r.durationMs, 0);
-      console.log(
-        `Measured execution time: ${totalMs} ms across ${withTime.length} test(s)`,
-      );
+      console.log(`Measured execution time: ${totalMs} ms across ${withTime.length} test(s)`);
     }
 
     console.log(c("cyan", "=============================================="));
@@ -229,9 +261,7 @@ export class JUnitReporter extends BaseReporter {
     const withTime = this.results.filter((r) => r.durationMs != null);
     const totalMs = withTime.reduce((sum, r) => sum + r.durationMs, 0);
 
-    const timestamp = this.runInfo
-      ? this.runInfo.startedAt.toISOString().replace(/\.\d+Z$/, "")
-      : "";
+    const timestamp = this.runInfo ? this.runInfo.startedAt.toISOString().replace(/\.\d+Z$/, "") : "";
 
     const lines = [];
     lines.push('<?xml version="1.0" encoding="UTF-8"?>');
@@ -248,25 +278,18 @@ export class JUnitReporter extends BaseReporter {
     for (const [file, list] of byFile) {
       const fileFail = list.filter((x) => !x.passed && !x.skipped).length;
       const fileSkip = list.filter((x) => x.skipped).length;
-      const fileMs = list
-        .filter((x) => x.durationMs != null)
-        .reduce((sum, x) => sum + x.durationMs, 0);
+      const fileMs = list.filter((x) => x.durationMs != null).reduce((sum, x) => sum + x.durationMs, 0);
 
       lines.push(
         `  <testsuite name="${escapeXml(file)}" tests="${list.length}" failures="${fileFail}" skipped="${fileSkip}" time="${(fileMs / 1000).toFixed(3)}">`,
       );
       for (const r of list) {
-        const time =
-          r.durationMs != null ? (r.durationMs / 1000).toFixed(3) : "0.000";
-        lines.push(
-          `    <testcase classname="${escapeXml(file)}" name="${escapeXml(r.procedure)}" time="${time}">`,
-        );
+        const time = r.durationMs != null ? (r.durationMs / 1000).toFixed(3) : "0.000";
+        lines.push(`    <testcase classname="${escapeXml(file)}" name="${escapeXml(r.procedure)}" time="${time}">`);
         if (r.skipped) {
           lines.push("      <skipped/>");
         } else if (!r.passed) {
-          lines.push(
-            `      <failure message="test failed"><![CDATA[${r.error || ""}]]></failure>`,
-          );
+          lines.push(`      <failure message="test failed"><![CDATA[${r.error || ""}]]></failure>`);
         }
         if (r.warning) {
           lines.push(`      <system-out>${escapeXml(r.warning)}</system-out>`);
