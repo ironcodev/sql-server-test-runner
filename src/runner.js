@@ -48,12 +48,7 @@ function extractSqlErrorNumber(text) {
  * `paths` may be a single string or an array of strings.
  * Files run sequentially; the first failure aborts the rest.
  */
-async function runScriptsOnDb(
-  cfg,
-  dbName,
-  paths,
-  { cwd = process.cwd(), assertSchema, debug, label = "script" } = {},
-) {
+async function runScriptsOnDb(cfg, dbName, paths, { cwd = process.cwd(), assertSchema, debug, label = "script" } = {}) {
   if (paths == null) return;
   const list = Array.isArray(paths) ? paths : [paths];
   for (const p of list) {
@@ -72,12 +67,7 @@ async function runScriptsOnDb(
   }
 }
 
-async function runScriptOnDb(
-  cfg,
-  dbName,
-  scriptPath,
-  { assertSchema, debug, testSuite, label } = {},
-) {
+async function runScriptOnDb(cfg, dbName, scriptPath, { assertSchema, debug, testSuite, label } = {}) {
   let scriptText;
   try {
     scriptText = await readTextFile(scriptPath);
@@ -91,10 +81,7 @@ async function runScriptOnDb(
   lines.push("");
   lines.push(scriptText);
 
-  const tmpFile = join(
-    tmpdir(),
-    `sstr_script_${Date.now()}_${Math.random().toString(36).slice(2)}.sql`,
-  );
+  const tmpFile = join(tmpdir(), `sstr_script_${Date.now()}_${Math.random().toString(36).slice(2)}.sql`);
   await writeFile(tmpFile, lines.join("\n"), "utf-8");
 
   try {
@@ -111,21 +98,13 @@ async function runScriptOnDb(
   }
 }
 
-async function runScriptTextOnDb(
-  cfg,
-  dbName,
-  scriptText,
-  { assertSchema, debug, label } = {},
-) {
+async function runScriptTextOnDb(cfg, dbName, scriptText, { assertSchema, debug, label } = {}) {
   const lines = [];
   if (assertSchema) lines.push(`:setvar AssertSchema "${assertSchema}"`);
   lines.push("");
   lines.push(scriptText);
 
-  const tmpFile = join(
-    tmpdir(),
-    `sstr_assert_${Date.now()}_${Math.random().toString(36).slice(2)}.sql`,
-  );
+  const tmpFile = join(tmpdir(), `sstr_assert_${Date.now()}_${Math.random().toString(36).slice(2)}.sql`);
   await writeFile(tmpFile, lines.join("\n"), "utf-8");
 
   try {
@@ -227,7 +206,24 @@ export async function run(
   const dbExists = await databaseExists(cfg, testDb, { debug });
 
   let targetDb;
+  let shuttingDown = false;
   let backupFile = null;
+
+  const onSigint = async () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    if (targetDb && !keepDb) {
+      try {
+        await dropDatabase(cfg, targetDb, { debug: false });
+      } catch (e) {
+        console.error(`Failed to drop test database "${targetDb}": ${e.message}`);
+        console.error(`You may need to run "sstr clean" before the next run.`);
+      }
+    }
+    process.exit(130);
+  };
+
+  process.on("SIGINT", onSigint);
 
   if (!dbExists) {
     progressLogger.log(`Database "${testDb}" does not exist; creating it...`);
@@ -241,9 +237,7 @@ export async function run(
     }
     const rand = Math.floor(Math.random() * 1e6);
     targetDb = `${testDb}_sstr_${rand}`;
-    progressLogger.log(
-      `Backing up "${testDb}" and restoring as "${targetDb}"...`,
-    );
+    progressLogger.log(`Backing up "${testDb}" and restoring as "${targetDb}"...`);
     backupFile = await backupAndRestore(cfg, testDb, targetDb, { debug });
     progressLogger.log("Restore completed.");
   }
@@ -257,9 +251,7 @@ export async function run(
       label: "assertions",
     });
     if (assertRes.code !== 0) {
-      throw new Error(
-        `Failed to deploy assertion procedures:\n${assertRes.stderr || assertRes.stdout}`,
-      );
+      throw new Error(`Failed to deploy assertion procedures:\n${assertRes.stderr || assertRes.stdout}`);
     }
     progressLogger.log("Assertion procedures created.");
 
@@ -353,9 +345,7 @@ export async function run(
         const current = await listStoredProcedures(cfg, targetDb, { debug });
         const currentSet = new Set(current);
         const newOnes = [...currentSet].filter((p) => !testedProcedures.has(p));
-        const testProcs = newOnes.filter((full) =>
-          isTestProcedure(full, { assertSchema, testSchemas, testMatch }),
-        );
+        const testProcs = newOnes.filter((full) => isTestProcedure(full, { assertSchema, testSchemas, testMatch }));
 
         for (const full of testProcs) {
           const bareName = full.split(".").pop().toLowerCase();
@@ -372,8 +362,7 @@ export async function run(
           const logExec = toBool(effective.logExecution, false);
           const skipTest = toBool(effective.skip, false);
           const expectedThrow = normalizeThrows(effective.throws);
-          const testTimeout =
-            effective.timeout != null ? Number(effective.timeout) : null;
+          const testTimeout = effective.timeout != null ? Number(effective.timeout) : null;
 
           if (skipTest) {
             reporter.addResult({
@@ -439,18 +428,14 @@ export async function run(
               if (succeeded) {
                 resultError = `Expected error ${expectedThrow}, but the test succeeded.`;
               } else if (errorNumber !== expectedThrow) {
-                resultError = `Expected error ${expectedThrow}, got ${
-                  errorNumber ?? "unknown"
-                }.\n${errorText}`;
+                resultError = `Expected error ${expectedThrow}, got ${errorNumber ?? "unknown"}.\n${errorText}`;
               }
             }
           }
 
           let warning = null;
           if (passed && !hasAssertion && expectedThrow === false) {
-            warning =
-              "Test passed without calling any assertion. " +
-              "Did you forget to add an Assert.* call?";
+            warning = "Test passed without calling any assertion. " + "Did you forget to add an Assert.* call?";
           }
 
           reporter.addResult({
@@ -526,13 +511,13 @@ export async function run(
     reporter.print();
     return reporter;
   } finally {
+    process.off("SIGINT", onSigint);
+
     if (!keepDb) {
       try {
         await dropDatabase(cfg, targetDb, { debug });
       } catch (e) {
-        progressLogger.error(
-          `Failed to drop database "${targetDb}": ${e.message}`,
-        );
+        progressLogger.error(`Failed to drop database "${targetDb}": ${e.message}`);
       }
 
       if (backupFile && cfg.cleanupBackup === true) {
@@ -540,9 +525,7 @@ export async function run(
           await unlink(backupFile);
           progressLogger.log(`Removed backup file: ${backupFile}`);
         } catch (e) {
-          progressLogger.error(
-            `Failed to remove backup file "${backupFile}": ${e.message}`,
-          );
+          progressLogger.error(`Failed to remove backup file "${backupFile}": ${e.message}`);
         }
       }
     } else {

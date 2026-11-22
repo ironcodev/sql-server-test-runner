@@ -151,7 +151,7 @@ begin
             N'begin try
                 set @msg =
                     case when @a collate ' + @collation + N' ' + (case when @equals = 1 then '=' else '<>' end) + ' @b collate ' + @collation
-            + N' then null else ''error'' end
+            + N' then null else ''__mismatch__'' end
               end try
               begin catch
                 if $(AssertSchema).is_debugging(''errors,e'') = 1
@@ -170,14 +170,13 @@ begin
                 @msg $(AssertSchema).assert_message out',
                 @a, @b, @msg out;
 
-        if @msg is not null
-            set @msg = $(AssertSchema)._quote(@a) +
-                        ' is ' +
-                        (case when @equals = 1 then 'not' else '' end) +
-                        ' equal to ' +
-                        $(AssertSchema)._quote(@b) +
-                        N' under collation ' +
-                        @collation;
+        if @msg = '__mismatch__'
+            set @msg =
+                $(AssertSchema)._quote(@a) +
+                N' is ' +
+                iif(@equals = 1, N'not equal to ', N'equal to ') +
+                $(AssertSchema)._quote(@b) +
+                N' under collation ' + @collation;
     end
 end
 go

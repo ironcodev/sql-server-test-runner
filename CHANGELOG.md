@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-11-22
+
+### Fixed
+
+- **Ctrl+C during `sstr run` now drops the test database.** When the user
+  interrupts a run, the restored/test database is dropped before the process
+  exits, so the next run does not fail with "database already exists" and no
+  orphaned `sstr_*` databases are left on the server. `--keep-db` still
+  preserves the database on interrupt.
+- The Ctrl+C cleanup is best-effort: if the drop fails (e.g. a lingering
+  `sqlcmd` child), the error is logged to `stderr` with a hint to run
+  `sstr clean`.
+
+### Changed
+
+- `runner.js` registers a `SIGINT` handler for the duration of the run and
+  removes it in `finally`.
+  
 ## [2.2.0] - 2026-11-19
 
 - **Breaking:** the default `testRegex` now matches only files under `<cwd>/tests`
