@@ -146,7 +146,11 @@ async function resolveBackupDir(
   const line = res.stdout.trim().split(/\r?\n/)[0] || "";
   const [backupPath, dataPath, logPath] = line.split("|").map((s) => s.trim());
 
-  const dir = backupPath || dataPath || logPath;
+  // sqlcmd prints NULL as the literal text "NULL" with -h -1.
+  // Treat that as missing.
+  const valid = (v) => v && v.toUpperCase() !== "NULL" ? v : null;
+
+  const dir = valid(backupPath) || valid(dataPath) || valid(logPath);
   if (!dir) {
     throw new Error(
       "Could not determine the SQL Server default backup path. " +
