@@ -30,6 +30,10 @@ Procedures in `assertSchema` are **excluded from test discovery**, so they are n
 
 All parameters are `sql_variant` so you can pass native values (`int`, `decimal`, `datetime`, `varchar`, …) without explicit casts. Casts are performed inside the procedures.
 
+All assertion procedures accept an optional `@label` parameter. When provided,
+it is included in the failure message, which helps when a single test
+procedure calls several assertions and you need to know which one failed.
+
 ### Boolean / null / numeric / empty
 
 | Procedure | Signature | Fails when |
@@ -99,6 +103,12 @@ Use `*Ordinal` when you need case- or accent-sensitive comparison but do not car
 exec Assert.MaxEquals cast(@a as nvarchar(max)), cast(@b as nvarchar(max));
 ```
 
+### Control flow
+
+| Procedure | Signature | Fails when |
+|---|---|---|
+| `Raises` | `@proc sysname, @err_number int = null, @label` | the procedure does **not** raise an error, or (when `@err_number` is provided) it raises an error with a different number. `@proc` may be schema-qualified (`'dbo.test_x'`) or unqualified (`'test_x'`). The procedure must be callable with no arguments. |
+
 ## Examples
 
 ```sql
@@ -148,6 +158,13 @@ exec Assert.EqualsOrdinal  'Hello', 'hello';   -- fail (case differs)
 exec Assert.BinaryEquals   'Hello', 'hello';   -- fail (bytes differ)
 exec Assert.BinaryEquals   'Hello', 'Hello ';  -- fail (trailing space is significant)
 exec Assert.EqualsOrdinal  'Hello', 'Hello ';  -- pass  (ANSI padding ignores trailing space)
+
+-- Any error is acceptable
+exec Assert.Raises 'dbo.test_should_throw';
+
+-- Only error 50001 is acceptable
+exec Assert.Raises 'dbo.test_should_throw', 50001;
+exec Assert.Raises 'dbo.test_should_raise', 50001, 'after insert';
 ```
 
 ## Limitations

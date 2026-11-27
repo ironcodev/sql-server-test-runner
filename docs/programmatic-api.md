@@ -71,7 +71,7 @@ Loads and merges the base config and the env-specific config.
 
 ### `validateConfig(cfg)`
 
-Throws if the config is invalid.
+Raises if the config is invalid.
 
 ### `run(cfg, options)`
 

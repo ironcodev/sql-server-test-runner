@@ -139,6 +139,13 @@ function nowMs() {
   return Number(process.hrtime.bigint() / 1000000n);
 }
 
+function writeProgress(initLogger, enabled, prefix, done, total) {
+  if (!enabled || total === 0) return;
+  const pct = Math.floor((done / total) * 100);
+  const line = `\r${prefix}[ ${String(pct).padStart(3)}% ]`;
+  initLogger.write(line);
+}
+
 export async function run(
   cfg,
   {
@@ -313,7 +320,8 @@ export async function run(
         continue;
       }
 
-      initLogger.write(`\n  ${c("cyan", count)}. ${filename} `);
+      const prefix = `\n  ${c("cyan", count)}. ${filename} `;
+      initLogger.write(prefix);
 
       if (scripts.preScript) {
         await runScriptsOnDb(cfg, targetDb, scripts.preScript, {
@@ -331,6 +339,8 @@ export async function run(
         testSuite: file,
       });
       const tFile = nowMs() - t0;
+      let total = 0;
+      let isTty = false;
 
       if (res.code !== 0) {
         reporter.addResult({
@@ -346,6 +356,13 @@ export async function run(
         const currentSet = new Set(current);
         const newOnes = [...currentSet].filter((p) => !testedProcedures.has(p));
         const testProcs = newOnes.filter((full) => isTestProcedure(full, { assertSchema, testSchemas, testMatch }));
+        
+        total = testProcs.length;
+        isTty = Boolean(process.stdout.isTTY);
+        
+        const showProgress = reportType === "console" && isTty && total > 0;
+
+        let done = 0;
 
         for (const full of testProcs) {
           const bareName = full.split(".").pop().toLowerCase();
@@ -448,6 +465,15 @@ export async function run(
           });
           testedProcedures.add(full);
 
+          done++;
+          if (showProgress) {
+            const pct = Math.floor((done / total) * 100);
+            process.stdout.write(`\r${prefix}[ ${String(pct).padStart(3)}% ]`);
+          } else if (reportType === "console" && total > 0 && done === total) {
+            // Non-TTY: one final progress line at 100%, then the badge overwrites it.
+            // (Optional; remove this branch if you want zero progress in non-TTY.)
+          }
+
           if (!passed && bail) {
             bailed = true;
             break;
@@ -479,7 +505,18 @@ export async function run(
             : skipped > 0
               ? c("yellow", "SKIP")
               : c("gray", "EMPTY");
-      initLogger.write(`[${badge}]\n`);
+
+      if (reportType === "console" && total > 0) {
+        if (isTty) {
+          const status = `[${badge}]`;
+          process.stdout.write(`\r${prefix}${status.padEnd(8)}\n`);
+        } else {
+          // No \r, no overwrite; just print the prefix + badge on its own line.
+          initLogger.write(`[${badge}]\n`);
+        }
+      } else {
+        initLogger.write(`[${badge}]\n`);
+      }
 
       let summary;
       if (fileResults.length === 0) {

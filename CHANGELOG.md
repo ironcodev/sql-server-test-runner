@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.2] - 2026-11-27
+
+### Added
+
+- `Assert.Raises` — asserts that a procedure raises an error. Signature:
+`@proc sysname, @err_number int = null, @label`. When `@err_number` is
+provided, the raised error number must match. Accepts an optional `@label`
+like the other assertions. Example:
+
+```sql
+exec Assert.Raises 'dbo.test_should_raise';
+exec Assert.Raises 'dbo.test_should_raise', 50001;
+exec Assert.Raises 'dbo.test_should_raise', 50001, 'after insert';
+```
+
 ## [2.2.1] - 2026-11-22
 
 ### Fixed

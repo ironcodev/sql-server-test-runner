@@ -1213,3 +1213,70 @@ begin
     exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
 end
 go
+
+create or alter proc $(AssertSchema).Raises
+(
+    @proc       sysname,
+    @err_number int = null,
+    @label      $(AssertSchema).label = null
+)
+as
+begin
+    set nocount on;
+
+    print 'SSTR_ASSERTION';
+
+    declare @sp sysname = object_name(@@procid)
+    declare @msg $(AssertSchema).assert_message
+    declare @should_raise bit = 0
+
+    -- Validate @proc first. A missing/empty name is a programming error,
+    -- not an assertion outcome, so it raises unconditionally.
+    if @proc is null or ltrim(rtrim(@proc)) = ''
+        raiserror('Raises: @proc parameter is required', 16, 1);
+
+    if @proc like '%[^A-Za-z0-9_.\[\]]%'
+        raiserror('Raises: @proc contains invalid characters', 16, 1);
+
+    -- Build the exec statement. QUOTENAME lets names with spaces or dots
+    -- survive; parsename splits an optional schema qualifier.
+    declare @sql nvarchar(max);
+    if parsename(@proc, 2) is null
+        set @sql = N'exec ' + quotename(parsename(@proc, 1), '[]');
+    else
+        set @sql = N'exec ' + quotename(parsename(@proc, 2), '[]') + N'.' + quotename(parsename(@proc, 1), '[]');
+
+    declare @raised        bit           = 0
+    declare @raised_number int           = null
+    declare @raised_msg    nvarchar(4000) = null
+
+    begin try
+        exec sp_executesql @sql;
+    end try
+    begin catch
+        set @raised        = 1
+        set @raised_number = error_number()
+        set @raised_msg    = error_message()
+    end catch
+
+    if @raised = 0
+    begin
+        set @should_raise = 1
+        set @msg = N'procedure ' + $(AssertSchema)._quote(@proc) + N' did not raise an error'
+    end
+    else if @err_number is not null and @raised_number <> @err_number
+    begin
+        set @should_raise = 1
+        set @msg =
+            N'procedure ' + $(AssertSchema)._quote(@proc) +
+            N' raised error ' + cast(@raised_number as nvarchar(20)) +
+            N' but ' + cast(@err_number as nvarchar(20)) + N' was expected' +
+            case when @raised_msg is not null and @raised_msg <> ''
+                 then N' (' + @raised_msg + N')'
+                 else N''
+            end
+    end
+
+    exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
+end
+go
