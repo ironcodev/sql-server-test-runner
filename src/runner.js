@@ -48,7 +48,12 @@ function extractSqlErrorNumber(text) {
  * `paths` may be a single string or an array of strings.
  * Files run sequentially; the first failure aborts the rest.
  */
-async function runScriptsOnDb(cfg, dbName, paths, { cwd = process.cwd(), assertSchema, debug, label = "script" } = {}) {
+async function runScriptsOnDb(
+  cfg,
+  dbName,
+  paths,
+  { cwd = process.cwd(), assertSchema, debug, label = "script" } = {},
+) {
   if (paths == null) return;
   const list = Array.isArray(paths) ? paths : [paths];
   for (const p of list) {
@@ -67,7 +72,12 @@ async function runScriptsOnDb(cfg, dbName, paths, { cwd = process.cwd(), assertS
   }
 }
 
-async function runScriptOnDb(cfg, dbName, scriptPath, { assertSchema, debug, testSuite, label } = {}) {
+async function runScriptOnDb(
+  cfg,
+  dbName,
+  scriptPath,
+  { assertSchema, debug, testSuite, label } = {},
+) {
   let scriptText;
   try {
     scriptText = await readTextFile(scriptPath);
@@ -81,7 +91,10 @@ async function runScriptOnDb(cfg, dbName, scriptPath, { assertSchema, debug, tes
   lines.push("");
   lines.push(scriptText);
 
-  const tmpFile = join(tmpdir(), `sstr_script_${Date.now()}_${Math.random().toString(36).slice(2)}.sql`);
+  const tmpFile = join(
+    tmpdir(),
+    `sstr_script_${Date.now()}_${Math.random().toString(36).slice(2)}.sql`,
+  );
   await writeFile(tmpFile, lines.join("\n"), "utf-8");
 
   try {
@@ -98,13 +111,21 @@ async function runScriptOnDb(cfg, dbName, scriptPath, { assertSchema, debug, tes
   }
 }
 
-async function runScriptTextOnDb(cfg, dbName, scriptText, { assertSchema, debug, label } = {}) {
+async function runScriptTextOnDb(
+  cfg,
+  dbName,
+  scriptText,
+  { assertSchema, debug, label } = {},
+) {
   const lines = [];
   if (assertSchema) lines.push(`:setvar AssertSchema "${assertSchema}"`);
   lines.push("");
   lines.push(scriptText);
 
-  const tmpFile = join(tmpdir(), `sstr_assert_${Date.now()}_${Math.random().toString(36).slice(2)}.sql`);
+  const tmpFile = join(
+    tmpdir(),
+    `sstr_assert_${Date.now()}_${Math.random().toString(36).slice(2)}.sql`,
+  );
   await writeFile(tmpFile, lines.join("\n"), "utf-8");
 
   try {
@@ -139,11 +160,25 @@ function nowMs() {
   return Number(process.hrtime.bigint() / 1000000n);
 }
 
-function writeProgress(initLogger, enabled, prefix, done, total) {
-  if (!enabled || total === 0) return;
-  const pct = Math.floor((done / total) * 100);
-  const line = `\r${prefix}[ ${String(pct).padStart(3)}% ]`;
-  initLogger.write(line);
+function expandPlaceholders(p, testFilePath) {
+  if (typeof p !== "string") return p;
+  const noExt = testFilePath.replace(/\.sql$/i, "");
+  const dir = noExt.replace(/[\\/][^\\/]+$/, "");
+  const base = noExt.replace(/^.*[\\/]/, "");
+  return p
+    .split("{test-file}")
+    .join(noExt)
+    .split("{test-path}")
+    .join(dir)
+    .split("{test-filename}")
+    .join(base);
+}
+
+function expandAll(paths, testFilePath) {
+  if (paths == null) return paths;
+  return Array.isArray(paths)
+    ? paths.map((p) => expandPlaceholders(p, testFilePath))
+    : expandPlaceholders(paths, testFilePath);
 }
 
 export async function run(
@@ -223,7 +258,9 @@ export async function run(
       try {
         await dropDatabase(cfg, targetDb, { debug: false });
       } catch (e) {
-        console.error(`Failed to drop test database "${targetDb}": ${e.message}`);
+        console.error(
+          `Failed to drop test database "${targetDb}": ${e.message}`,
+        );
         console.error(`You may need to run "sstr clean" before the next run.`);
       }
     }
@@ -244,7 +281,9 @@ export async function run(
     }
     const rand = Math.floor(Math.random() * 1e6);
     targetDb = `${testDb}_sstr_${rand}`;
-    progressLogger.log(`Backing up "${testDb}" and restoring as "${targetDb}"...`);
+    progressLogger.log(
+      `Backing up "${testDb}" and restoring as "${targetDb}"...`,
+    );
     backupFile = await backupAndRestore(cfg, testDb, targetDb, { debug });
     progressLogger.log("Restore completed.");
   }
@@ -258,7 +297,9 @@ export async function run(
       label: "assertions",
     });
     if (assertRes.code !== 0) {
-      throw new Error(`Failed to deploy assertion procedures:\n${assertRes.stderr || assertRes.stdout}`);
+      throw new Error(
+        `Failed to deploy assertion procedures:\n${assertRes.stderr || assertRes.stdout}`,
+      );
     }
     progressLogger.log("Assertion procedures created.");
 
@@ -316,12 +357,17 @@ export async function run(
 
       // Skip the whole file if requested at the file level.
       if (toBool(fileLevelOptions.skip, false)) {
-        initLogger.log(`\n  ${c("cyan", count)}. ${filename} ${c("yellow", "(skipped)")}`);
+        initLogger.log(
+          `\n  ${c("cyan", count)}. ${filename} ${c("yellow", "(skipped)")}`,
+        );
         continue;
       }
 
       const prefix = `\n  ${c("cyan", count)}. ${filename}\n`;
       initLogger.write(prefix);
+
+      expandAll(scripts.preScript, file);
+      expandAll(scripts.postScript, file);
 
       if (scripts.preScript) {
         await runScriptsOnDb(cfg, targetDb, scripts.preScript, {
@@ -354,10 +400,12 @@ export async function run(
         const current = await listStoredProcedures(cfg, targetDb, { debug });
         const currentSet = new Set(current);
         const newOnes = [...currentSet].filter((p) => !testedProcedures.has(p));
-        const testProcs = newOnes.filter((full) => isTestProcedure(full, { assertSchema, testSchemas, testMatch }));
-        
+        const testProcs = newOnes.filter((full) =>
+          isTestProcedure(full, { assertSchema, testSchemas, testMatch }),
+        );
+
         total = testProcs.length;
-        
+
         const showProgress = reportType === "console" && total > 0;
 
         let done = 0;
@@ -377,7 +425,8 @@ export async function run(
           const logExec = toBool(effective.logExecution, false);
           const skipTest = toBool(effective.skip, false);
           const expectedThrow = normalizeThrows(effective.throws);
-          const testTimeout = effective.timeout != null ? Number(effective.timeout) : null;
+          const testTimeout =
+            effective.timeout != null ? Number(effective.timeout) : null;
 
           if (skipTest) {
             reporter.addResult({
@@ -391,6 +440,9 @@ export async function run(
             testedProcedures.add(full);
             continue;
           }
+
+          expandAll(effective.preScript, file);
+          expandAll(effective.postScript, file);
 
           if (effective.preScript) {
             await runScriptsOnDb(cfg, targetDb, effective.preScript, {
@@ -450,7 +502,9 @@ export async function run(
 
           let warning = null;
           if (passed && !hasAssertion && expectedThrow === false) {
-            warning = "Test passed without calling any assertion. " + "Did you forget to add an Assert.* call?";
+            warning =
+              "Test passed without calling any assertion. " +
+              "Did you forget to add an Assert.* call?";
           }
 
           reporter.addResult({
@@ -464,7 +518,7 @@ export async function run(
           testedProcedures.add(full);
 
           done++;
-          
+
           if (showProgress) {
             const pct = Math.floor((done / total) * 100);
             process.stdout.write(`\r ... [ ${String(pct).padStart(3)}% ]`);
@@ -539,7 +593,9 @@ export async function run(
       try {
         await dropDatabase(cfg, targetDb, { debug });
       } catch (e) {
-        progressLogger.error(`Failed to drop database "${targetDb}": ${e.message}`);
+        progressLogger.error(
+          `Failed to drop database "${targetDb}": ${e.message}`,
+        );
       }
 
       if (backupFile && cfg.cleanupBackup === true) {
@@ -547,7 +603,9 @@ export async function run(
           await unlink(backupFile);
           progressLogger.log(`Removed backup file: ${backupFile}`);
         } catch (e) {
-          progressLogger.error(`Failed to remove backup file "${backupFile}": ${e.message}`);
+          progressLogger.error(
+            `Failed to remove backup file "${backupFile}": ${e.message}`,
+          );
         }
       }
     } else {

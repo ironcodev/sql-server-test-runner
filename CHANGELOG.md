@@ -22,6 +22,10 @@ exec Assert.Raises 'dbo.test_should_raise', 50001;
 exec Assert.Raises 'dbo.test_should_raise', 50001, 'after insert';
 ```
 
+- `preScript` and `postScript` (file-level and per-SP) accept `{test-file}`,
+  `{test-filename}`, and `{test-path}` placeholders. Works for a single path
+  or an array.
+  
 ## [2.2.1] - 2026-11-22
 
 ### Fixed

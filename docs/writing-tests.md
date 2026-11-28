@@ -134,6 +134,29 @@ one file.
 | `postScript` | string or string[] | `null` | Path(s) to `.sql` file(s) that run after this test. |
 | `throws` | boolean or number | `false` | Require the test to fail (any error, or a specific SQL Server error number). |
 
+`preScript` and `postScript` (file-level and per-SP) support three placeholders:
+
+| Placeholder | Expands to |
+|---|---|
+| `{test-file}` | full path of the test file, without `.sql` |
+| `{test-filename}` | basename of the test file, without `.sql` |
+| `{test-path}` | directory containing the test file |
+
+Example:
+
+```json
+{
+  "files": {
+    "my_udf": {
+      "preScript": "{test-file}.setup.sql",
+      "postScript": "{test-path}/teardown/{test-filename}.sql"
+    }
+  }
+}
+```
+
+`warmUp` and `coolDown` do not support these placeholders.
+
 ### Resolution order
 
 1. `sstr` defaults
