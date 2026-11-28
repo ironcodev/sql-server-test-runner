@@ -320,7 +320,7 @@ export async function run(
         continue;
       }
 
-      const prefix = `  ${c("cyan", count)}. ${filename} `;
+      const prefix = `\n  ${c("cyan", count)}. ${filename}\n`;
       initLogger.write(prefix);
 
       if (scripts.preScript) {
@@ -464,14 +464,10 @@ export async function run(
           testedProcedures.add(full);
 
           done++;
+          
           if (showProgress) {
             const pct = Math.floor((done / total) * 100);
-            const clearWidth = Math.max(0, prefix.length - 5);
-            process.stdout.write(`\r${" ".repeat(clearWidth)} ... [ ${String(pct).padStart(3)}% ]`);
-            
-            if (pct == 100) {
-              process.stdout.write(`\r${' '.repeat(prefix.length + 8)}`);  
-            }
+            process.stdout.write(`\r ... [ ${String(pct).padStart(3)}% ]`);
           }
 
           if (!passed && bail) {
@@ -506,9 +502,6 @@ export async function run(
               ? c("yellow", "SKIP")
               : c("gray", "EMPTY");
 
-      const status = `[${badge}]`;
-      initLogger.write(`\n${prefix}${status.padEnd(8)}\n`);
-
       let summary;
       if (fileResults.length === 0) {
         summary = `     (no test procedures found)`;
@@ -518,7 +511,8 @@ export async function run(
         summary = `     ( tests: ${fileResults.length}, pass: ${pass}, fail: ${fail}${skipped ? `, skipped: ${skipped}` : ""} )`;
       }
 
-      initLogger.log(summary);
+      const cr = reportType === "console" ? "\r" : "";
+      initLogger.log(`${cr}${summary} [${badge}]`);
     }
 
     if (!bailed && scripts.coolDown) {

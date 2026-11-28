@@ -102,42 +102,29 @@ export class ConsoleReporter extends BaseReporter {
       byFile.get(r.file).push(r);
     }
 
-    console.log("");
     // console.log("Per-file details:");
 
-    // const root = process.cwd();
+    const root = process.cwd();
 
-    for (const f of this.files) {
-      const list = byFile.get(f) || [];
-      /*
-      const filename = f.replace(root, "").replace(/\\/g, '/');
-      const skipped = list.filter((x) => x.skipped).length;
-      const pass = list.filter((x) => x.passed && !x.skipped).length;
-      const fail = list.filter((x) => !x.passed && !x.skipped).length;
-      const badge =
-        fail > 0
-          ? c("red", "FAIL")
-          : pass > 0
-            ? c("green", "PASS")
-            : skipped > 0
-              ? c("gray", "SKIP")
-              : c("gray", "EMPTY");
-      console.log(`  - ${filename} [${badge}]`);
-      console.log(
-        `      procedures: ${list.length}, pass: ${pass}, fail: ${fail}${
-          skipped ? `, skipped: ${skipped}` : ""
-        }`,
-      );
-      */
+    for (const file of this.files) {
+      const list = byFile.get(file) || [];
       const withTime = list.filter((r) => r.durationMs != null);
+
       if (withTime.length > 0) {
+        const filename = file.replace(root, "").replace(/\\/g, "/");
+
+        console.log("");
         console.log("      execution times:");
+        console.log(`        ${c("cyan", filename)}\n`);
         const labels = withTime.map((r) => `${r.durationMs} ms`);
         const width = Math.max(...labels.map((s) => s.length));
+        let totalTime = 0;
         for (let i = 0; i < withTime.length; i++) {
           const r = withTime[i];
-          console.log(`        ${labels[i].padStart(width)}  ${r.procedure}`);
+          totalTime += r.durationMs;
+          console.log(`          ${labels[i].padStart(width)}  ${r.procedure}`);
         }
+        console.log(`\n        Total measured time: ${c("green", totalTime)} ms`);
       }
 
       const warned = list.filter((r) => r.warning);
@@ -192,7 +179,7 @@ export class ConsoleReporter extends BaseReporter {
     const failed = this.results.filter((r) => !r.passed && !r.skipped).length;
     const warningCount = this.results.filter((r) => r.warning).length;
 
-    console.log("----------------------------------------------");
+    console.log("\n----------------------------------------------");
     const passLabel = c("green", `pass: ${passed}`);
     const failLabel = failed > 0 ? c("red", `fail: ${failed}`) : c("gray", `fail: ${failed}`);
     const skipLabel = skipped > 0 ? `, skipped: ${skipped}` : "";
