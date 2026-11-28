@@ -320,7 +320,7 @@ export async function run(
         continue;
       }
 
-      const prefix = `\n  ${c("cyan", count)}. ${filename} `;
+      const prefix = `  ${c("cyan", count)}. ${filename} `;
       initLogger.write(prefix);
 
       if (scripts.preScript) {
@@ -340,7 +340,6 @@ export async function run(
       });
       const tFile = nowMs() - t0;
       let total = 0;
-      let isTty = false;
 
       if (res.code !== 0) {
         reporter.addResult({
@@ -358,9 +357,8 @@ export async function run(
         const testProcs = newOnes.filter((full) => isTestProcedure(full, { assertSchema, testSchemas, testMatch }));
         
         total = testProcs.length;
-        isTty = Boolean(process.stdout.isTTY);
         
-        const showProgress = reportType === "console" && isTty && total > 0;
+        const showProgress = reportType === "console" && total > 0;
 
         let done = 0;
 
@@ -468,10 +466,12 @@ export async function run(
           done++;
           if (showProgress) {
             const pct = Math.floor((done / total) * 100);
-            process.stdout.write(`\r${prefix}[ ${String(pct).padStart(3)}% ]`);
-          } else if (reportType === "console" && total > 0 && done === total) {
-            // Non-TTY: one final progress line at 100%, then the badge overwrites it.
-            // (Optional; remove this branch if you want zero progress in non-TTY.)
+            const clearWidth = Math.max(0, prefix.length - 5);
+            process.stdout.write(`\r${" ".repeat(clearWidth)} ... [ ${String(pct).padStart(3)}% ]`);
+            
+            if (pct == 100) {
+              process.stdout.write(`\r${' '.repeat(prefix.length + 8)}`);  
+            }
           }
 
           if (!passed && bail) {
@@ -506,17 +506,8 @@ export async function run(
               ? c("yellow", "SKIP")
               : c("gray", "EMPTY");
 
-      if (reportType === "console" && total > 0) {
-        if (isTty) {
-          const status = `[${badge}]`;
-          process.stdout.write(`\r${prefix}${status.padEnd(8)}\n`);
-        } else {
-          // No \r, no overwrite; just print the prefix + badge on its own line.
-          initLogger.write(`[${badge}]\n`);
-        }
-      } else {
-        initLogger.write(`[${badge}]\n`);
-      }
+      const status = `[${badge}]`;
+      initLogger.write(`\n${prefix}${status.padEnd(8)}\n`);
 
       let summary;
       if (fileResults.length === 0) {
