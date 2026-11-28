@@ -70,6 +70,10 @@ or an array of paths that run in order.
 | `preScript` | Before each test file. |
 | `postScript` | After each test file. |
 
+`preScript` and `postScript` support the `{test-file}`, `{test-filename}`,
+and `{test-path}` placeholders (see [Writing Tests](https://github.com/ironcodev/sql-server-test-runner/blob/main/docs/writing-tests.md)).
+`warmUp` and `coolDown` do not.
+
 Arrays run in order; if one file fails, the run aborts.
 
 ```json
@@ -132,10 +136,12 @@ All optional. Each key maps to a `sqlcmd` switch.
 
 ### Project-level test options (`tests/sstr.json`)
 
-File-level test settings live in `tests/sstr.json`:
+File-level test settings live in `tests/sstr.json`. `tests/sstr.json` also accepts top-level `preScript` and `postScript`, applied to every test file:
 
 ```json
 {
+  "preScript": "{test-file}.setup.sql",
+  "postScript": "{test-file}.teardown.sql",
   "files": {
     "sum": { "skip": true, "logExecution": true },
     "users.test": { "skip": true },
@@ -160,6 +166,22 @@ procedures/phase1/sum  >  sum.test  >  sum
 ```
 
 If several keys match, their options are merged with this priority.
+
+Precedence, low → high:
+
+scripts.* in sstr.config.json
+
+top-level `preScript` / `postScript` in `tests/sstr.json`
+
+files.<name> in `tests/sstr.json`
+
+A per-file entry set to null disables the top-level value for that file.
+
+A missing file for a top-level `preScript` / `postScript` logs a warning
+and is skipped, so a default hook can apply to many files without requiring
+every file to have the sibling script. Missing files for files.<name>
+overrides, per-SP hooks, and `scripts.*` in `sstr.config.json` remain
+hard errors.
 
 ### Per-SP options (`tests/sum.test.json`)
 

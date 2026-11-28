@@ -136,11 +136,16 @@ one file.
 
 `preScript` and `postScript` (file-level and per-SP) support three placeholders:
 
-| Placeholder | Expands to |
-|---|---|
-| `{test-file}` | full path of the test file, without `.sql` |
-| `{test-filename}` | basename of the test file, without `.sql` |
-| `{test-path}` | directory containing the test file |
+| Placeholder | Expands to | Example for `tests/functions/column_default.test.sql` |
+|---|---|---|
+| `{test-file}` | full path, without `.sql` and without a trailing `.test` / `.spec` | `tests/functions/column_default` |
+| `{test-filename}` | basename, without `.sql` and without a trailing `.test` / `.spec` | `column_default` |
+| `{test-path}` | directory containing the test file | `tests/functions` |
+
+A trailing `.test` or `.spec` is stripped from `{test-file}` and
+`{test-filename}`, so `column_default.test.sql` produces `column_default`,
+not `column_default.test`. This lets setup and teardown scripts use the
+same base name as the test file.
 
 Example:
 
@@ -154,6 +159,10 @@ Example:
   }
 }
 ```
+
+For `tests/procedures/my_udf.test.sql`, the above resolves to
+`tests/procedures/my_udf.test.setup.sql` and
+`tests/procedures/teardown/my_udf.test.sql`.
 
 `warmUp` and `coolDown` do not support these placeholders.
 

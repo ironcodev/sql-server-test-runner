@@ -76,6 +76,10 @@ The SQL Server service account cannot write to `backupPath`. Choose a directory 
 
 If `backupPath` is empty, `sstr` asks SQL Server for its default paths. If those are also inaccessible, set `backupPath` explicitly.
 
+If the error shows a path like `...\Backup\NULL\...`, the server returned
+`NULL` for `InstanceDefaultBackupPath` and the tool previously treated it as
+a directory. This is fixed in version `2.2.2`; set `backupPath` explicitly if you are on an older version, or upgrade.
+
 ## `A file activation error occurred` (Msg 5105) during RESTORE
 
 This means SQL Server cannot create the restored `.mdf`/`.ldf` files at the target path. The directory in `backupPath` must be writable by the service account **for data files**, not just for `.bak` files.

@@ -12,20 +12,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `Assert.Raises` — asserts that a procedure raises an error. Signature:
-`@proc sysname, @err_number int = null, @label`. When `@err_number` is
-provided, the raised error number must match. Accepts an optional `@label`
-like the other assertions. Example:
+  `@proc sysname, @err_number int = null, @label`. When `@err_number` is
+  provided, the raised error number must match.
+- `preScript` and `postScript` accept `{test-file}`, `{test-filename}`, and
+  `{test-path}` placeholders. Works for a single path or an array, at the
+  file level and per-SP.
+- `tests/sstr.json` accepts top-level `preScript` / `postScript`, applied to
+  every test file and overridable per file (`null` disables the default).
 
-```sql
-exec Assert.Raises 'dbo.test_should_raise';
-exec Assert.Raises 'dbo.test_should_raise', 50001;
-exec Assert.Raises 'dbo.test_should_raise', 50001, 'after insert';
-```
+### Fixed
 
-- `preScript` and `postScript` (file-level and per-SP) accept `{test-file}`,
-  `{test-filename}`, and `{test-path}` placeholders. Works for a single path
-  or an array.
-  
+- Backup path resolution on instances where
+  `SERVERPROPERTY('InstanceDefaultBackupPath')` returns `NULL` (e.g. SQL
+  Server 2014 with no configured backup path). `sqlcmd -h -1` prints `NULL`
+  as the literal string `"NULL"`, which was treated as a valid directory and
+  produced paths like `...\Backup\NULL\sstr_....bak`. The query now uses
+  `ISNULL(..., '')`, and the JS side ignores empty and `"NULL"` values.
+
+### Changed
+
+- A missing file for a top-level `preScript` / `postScript` in
+  `tests/sstr.json` logs a warning and is skipped. Missing files for
+  `files.<name>` overrides, per-SP hooks, and `scripts.*` remain hard errors.
+- `{test-file}` and `{test-filename}` now also strip a trailing `.test` or
+  `.spec` from the test file name, so `column_default.test.sql` expands to
+  `column_default` instead of `column_default.test`.
+
 ## [2.2.1] - 2026-11-22
 
 ### Fixed

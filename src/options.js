@@ -149,6 +149,15 @@ export function getFileOptions(projectOptions, testFilePath) {
     const opts = projectOptions.files.get(k);
     if (opts) merged = { ...merged, ...opts };
   }
+  for (const key of ["preScript", "postScript"]) {
+    if (
+      !Object.prototype.hasOwnProperty.call(merged, key) &&
+      projectOptions[key] != null
+    ) {
+      merged[key] = projectOptions[key];
+      merged[`__${key}FromTopLevel`] = true; // internal marker
+    }
+  }
   return merged;
 }
 

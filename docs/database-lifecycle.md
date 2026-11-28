@@ -41,6 +41,13 @@ Common choices:
 - `C:\Program Files\Microsoft SQL Server\MSSQL16.MSSQLSERVER\MSSQL\DATA`
 - `/var/opt/mssql/backups` (Linux)
 
+> If `SERVERPROPERTY('InstanceDefaultBackupPath')` returns `NULL` (common on
+> SQL Server 2014 instances with no configured backup directory), the tool
+> falls through to `InstanceDefaultDataPath`, then `InstanceDefaultLogPath`.
+> If none is available, the run aborts with a clear error asking you to set
+> `backupPath`. The literal string `"NULL"` (as printed by `sqlcmd -h -1`)
+> is never treated as a directory name.
+
 ### `cleanupBackup`
 
 If `cleanupBackup` is `true`, `sstr` deletes the `.bak` file after the database is dropped. If `false` (default), the file is kept. Use `sstr clean` to remove leftover backups.

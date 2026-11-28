@@ -52,7 +52,13 @@ async function runScriptsOnDb(
   cfg,
   dbName,
   paths,
-  { cwd = process.cwd(), assertSchema, debug, label = "script" } = {},
+  {
+    cwd = process.cwd(),
+    assertSchema,
+    debug,
+    label = "script",
+    onMissing = "error",
+  } = {},
 ) {
   if (paths == null) return;
   const list = Array.isArray(paths) ? paths : [paths];
@@ -61,6 +67,13 @@ async function runScriptsOnDb(
       throw new Error(`Invalid ${label} path: ${JSON.stringify(p)}`);
     }
     const full = resolvePath(cwd, p);
+    if (onMissing === "warn") {
+      const exists = await fileExists(full);
+      if (!exists) {
+        console.warn(`[sstr] Warning: ${label} "${p}" not found; skipping.`);
+        continue;
+      }
+    }
     const res = await runScriptOnDb(cfg, dbName, full, {
       assertSchema,
       debug,
@@ -163,11 +176,12 @@ function nowMs() {
 function expandPlaceholders(p, testFilePath) {
   if (typeof p !== "string") return p;
   const noExt = testFilePath.replace(/\.sql$/i, "");
-  const dir = noExt.replace(/[\\/][^\\/]+$/, "");
-  const base = noExt.replace(/^.*[\\/]/, "");
+  const noTest = noExt.replace(/\.(test|spec)$/i, "");
+  const dir = noTest.replace(/[\\/][^\\/]+$/, "");
+  const base = noTest.replace(/^.*[\\/]/, "");
   return p
     .split("{test-file}")
-    .join(noExt)
+    .join(noTest)
     .split("{test-path}")
     .join(dir)
     .split("{test-filename}")
@@ -354,6 +368,33 @@ export async function run(
 
       // File-level options from tests/sstr.json.
       const fileLevelOptions = getFileOptions(projectOptions, file);
+      const preSrc = Object.prototype.hasOwnProperty.call(
+        fileLevelOptions,
+        "preScript",
+      )
+        ? {
+            value: fileLevelOptions.preScript,
+            onMissing: fileLevelOptions.__preScriptFromTopLevel
+              ? "warn"
+              : "error",
+          }
+        : scripts.preScript
+          ? { value: scripts.preScript, onMissing: "error" }
+          : null;
+
+      const postSrc = Object.prototype.hasOwnProperty.call(
+        fileLevelOptions,
+        "postScript",
+      )
+        ? {
+            value: fileLevelOptions.postScript,
+            onMissing: fileLevelOptions.__postScriptFromTopLevel
+              ? "warn"
+              : "error",
+          }
+        : scripts.postScript
+          ? { value: scripts.postScript, onMissing: "error" }
+          : null;
 
       // Skip the whole file if requested at the file level.
       if (toBool(fileLevelOptions.skip, false)) {
@@ -366,15 +407,13 @@ export async function run(
       const prefix = `\n  ${c("cyan", count)}. ${filename}\n`;
       initLogger.write(prefix);
 
-      expandAll(scripts.preScript, file);
-      expandAll(scripts.postScript, file);
-
-      if (scripts.preScript) {
-        await runScriptsOnDb(cfg, targetDb, scripts.preScript, {
+      if (preSrc && preSrc.value != null) {
+        await runScriptsOnDb(cfg, targetDb, expandAll(preSrc.value, file), {
           cwd,
           assertSchema,
           debug,
           label: `preScript for "${file}"`,
+          onMissing: preSrc.onMissing,
         });
       }
 
@@ -441,16 +480,18 @@ export async function run(
             continue;
           }
 
-          expandAll(effective.preScript, file);
-          expandAll(effective.postScript, file);
-
           if (effective.preScript) {
-            await runScriptsOnDb(cfg, targetDb, effective.preScript, {
-              cwd,
-              assertSchema,
-              debug,
-              label: `preScript for "${full}"`,
-            });
+            await runScriptsOnDb(
+              cfg,
+              targetDb,
+              expandAll(effective.preScript, file),
+              {
+                cwd,
+                assertSchema,
+                debug,
+                label: `preScript for "${full}"`,
+              },
+            );
           }
 
           const t1 = nowMs();
@@ -462,12 +503,17 @@ export async function run(
           const t2 = nowMs() - t1;
 
           if (effective.postScript) {
-            await runScriptsOnDb(cfg, targetDb, effective.postScript, {
-              cwd,
-              assertSchema,
-              debug,
-              label: `postScript for "${full}"`,
-            });
+            await runScriptsOnDb(
+              cfg,
+              targetDb,
+              expandAll(effective.postScript, file),
+              {
+                cwd,
+                assertSchema,
+                debug,
+                label: `postScript for "${full}"`,
+              },
+            );
           }
 
           const succeeded = execRes.code === 0;
@@ -531,12 +577,13 @@ export async function run(
         }
       }
 
-      if (scripts.postScript) {
-        await runScriptsOnDb(cfg, targetDb, scripts.postScript, {
+      if (postSrc && postSrc.value != null) {
+        await runScriptsOnDb(cfg, targetDb, expandAll(postSrc.value, file), {
           cwd,
           assertSchema,
           debug,
           label: `postScript for "${file}"`,
+          onMissing: postSrc.onMissing,
         });
       }
 
