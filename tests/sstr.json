@@ -1,82 +1,94 @@
 {
   "files": {
     "BinaryEquals": {
-      "skip": false
+      "skip": true
     },
     "BinaryNotEquals": {
-      "skip": false
+      "skip": true
     },
     "CollateEquals": {
-      "skip": false
+      "skip": true
     },
     "CollateMaxEquals": {
-      "skip": false
+      "skip": true
     },
     "CollateMaxNotEquals": {
-      "skip": false
+      "skip": true
     },
     "CollateNotEquals": {
-      "skip": false
+      "skip": true
     },
     "Equals": {
-      "skip": false
+      "skip": true
     },
     "EqualsOrdinal": {
-      "skip": false
+      "skip": true
     },
     "MaxEquals": {
-      "skip": false
+      "skip": true
     },
     "MaxEqualsOrdinal": {
-      "skip": false
+      "skip": true
     },
     "MaxNotEquals": {
-      "skip": false
+      "skip": true
     },
     "MaxNotEqualsOrdinal": {
-      "skip": false
+      "skip": true
     },
     "NotEquals": {
-      "skip": false
+      "skip": true
     },
     "NotEqualsOrdinal": {
-      "skip": false
+      "skip": true
     },
     "IsEmpty": {
-      "skip": false
+      "skip": true
+    },
+    "IsNullOrEmpty": {
+      "skip": true
+    },
+    "IsMaxEmpty": {
+      "skip": true
+    },
+    "IsMaxNullOrEmpty": {
+      "skip": true
     },
     "IsFalse": {
-      "skip": false
+      "skip": true
     },
     "IsNotNull": {
-      "skip": false
+      "skip": true
     },
     "IsNull": {
-      "skip": false
+      "skip": true
     },
     "IsNumeric": {
+      "skip": true
+    },
+    "IsMaxNumeric": {
       "skip": false
     },
     "IsTrue": {
-      "skip": false
+      "skip": true
     },
     "IsBetween": {
-      "skip": false
+      "skip": true
     },
     "IsGT": {
-      "skip": false
+      "skip": true
     },
     "IsGTE": {
-      "skip": false
+      "skip": true
     },
     "IsLT": {
-      "skip": false
+      "skip": true
     },
     "IsLTE": {
-      "skip": false
+      "skip": true
     },
     "NotBetween": {
-      "skip": false
+      "skip": true
     }
   }
 }

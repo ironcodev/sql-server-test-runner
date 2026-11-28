@@ -196,6 +196,39 @@ exec $(AssertSchema).[' + @operator + '] @a, @label'
 end
 go
 
+create or alter proc dbo._testcase_unary_max
+(
+    @operator varchar(50),
+    @a        nvarchar(max),
+    @label    nvarchar(500),
+    @expect   bit
+)
+as
+begin
+    set nocount on;
+
+    begin try
+        declare @query nvarchar(1000) = N'
+exec $(AssertSchema).[' + @operator + '] @a, @label'
+
+        if $(AssertSchema).is_debugging('query,q') = 1
+            print @query
+
+        exec sp_executesql @query,
+            N'@a nvarchar(max), @label nvarchar(500)',
+            @a = @a, @label = @label
+
+        if @expect = 0
+            raiserror('expected failure did not occur', 16, 1)
+    end try
+    begin catch
+        if @expect = 1
+            throw;
+        exec $(AssertSchema).IsTrue 1, @label;
+    end catch
+end
+go
+
 create or alter proc dbo._testcase_between
 (
     @operator varchar(50),

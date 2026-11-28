@@ -401,11 +401,11 @@ begin
 
     declare @sa nvarchar(max) = convert(nvarchar(max), @a);
 
-    set @should_raise = case when @a is not null then 1 else 0 end
+    set @should_raise = case when @sa is not null then 1 else 0 end
 
     set @msg = case
-        when @a is not null then N'value ' + $(AssertSchema)._quote(@sa) + N' is not null'
-        else N''   -- never raised
+        when @sa is not null then N'value ' + $(AssertSchema)._quote(@sa) + N' is not null'
+        else N''
     end
 
     exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
@@ -431,7 +431,59 @@ begin
 
     set @msg = case
         when @a is null then N'value is null'
-        else N''   -- never raised
+        else N''
+    end
+
+    exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
+end
+go
+
+create or alter proc $(AssertSchema).IsMaxNull
+(
+    @a     nvarchar(max),
+    @label $(AssertSchema).label = null
+)
+as
+begin
+    set nocount on;
+
+    print 'SSTR_ASSERTION';
+
+    declare @sp sysname = object_name(@@procid)
+    declare @msg $(AssertSchema).assert_message
+    declare @should_raise bit
+
+    set @should_raise = case when @a is not null then 1 else 0 end
+
+    set @msg = case
+        when @should_raise = 1 then N'value is not null'
+        else N''
+    end
+
+    exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
+end
+go
+
+create or alter proc $(AssertSchema).IsMaxNotNull
+(
+    @a     nvarchar(max),
+    @label $(AssertSchema).label = null
+)
+as
+begin
+    set nocount on;
+
+    print 'SSTR_ASSERTION';
+
+    declare @sp sysname = object_name(@@procid)
+    declare @msg $(AssertSchema).assert_message
+    declare @should_raise bit
+
+    set @should_raise = case when @a is null then 1 else 0 end
+
+    set @msg = case
+        when @should_raise = 1 then N'value is null'
+        else N''
     end
 
     exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
@@ -464,7 +516,41 @@ begin
 
     set @msg = case
         when @a is null then N'value is null'
-        else N'value ' + $(AssertSchema)._quote(@sa) + N' is not numeric'
+        when @fa is null then N'value ' + $(AssertSchema)._quote(@sa) + N' is not numeric'
+        else N''
+    end
+
+    exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
+end
+go
+
+create or alter proc $(AssertSchema).IsMaxNumeric
+(
+    @a     nvarchar(max),
+    @label $(AssertSchema).label = null
+)
+as
+begin
+    set nocount on;
+
+    print 'SSTR_ASSERTION';
+
+    declare @sp sysname = object_name(@@procid)
+    declare @msg $(AssertSchema).assert_message
+    declare @should_raise bit
+
+    declare @fa float = try_cast(@a as float);
+
+    set @should_raise = case
+        when @a is null then 1
+        when @fa is null then 1
+        else 0
+    end
+
+    set @msg = case
+        when @a is null then N'value is null'
+        when @fa is null then N'value is not numeric'
+        else N''
     end
 
     exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
@@ -489,14 +575,104 @@ begin
     declare @sa nvarchar(max) = convert(nvarchar(max), @a);
 
     set @should_raise = case
-        when @a is null then 1
-        when @sa <> N'' then 1
-        else 0
+        when datalength(isnull(trim(@sa), '')) = 0 then 0
+        else 1
     end
 
     set @msg = case
         when @a is null then N'value is null'
-        else N'value ' + $(AssertSchema)._quote(@sa) + N' is not empty'
+        when @should_raise = 1 then N'value is not empty'
+        else N''
+    end
+
+    exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
+end
+go
+
+create or alter proc $(AssertSchema).IsNullOrEmpty
+(
+    @a     sql_variant,
+    @label $(AssertSchema).label = null
+)
+as
+begin
+    set nocount on;
+
+    print 'SSTR_ASSERTION';
+
+    declare @sp sysname = object_name(@@procid)
+    declare @msg $(AssertSchema).assert_message
+    declare @should_raise bit
+
+    declare @sa nvarchar(max) = convert(nvarchar(max), @a);
+
+    set @should_raise = case
+        when @sa is null or @sa = N'' then 0
+        else 1
+    end
+
+    set @msg = case
+        when @should_raise = 1 then N'value is not null or empty'
+        else N''
+    end
+
+    exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
+end
+go
+
+create or alter proc $(AssertSchema).IsMaxEmpty
+(
+    @a     nvarchar(max),
+    @label $(AssertSchema).label = null
+)
+as
+begin
+    set nocount on;
+
+    print 'SSTR_ASSERTION';
+
+    declare @sp sysname = object_name(@@procid)
+    declare @msg $(AssertSchema).assert_message
+    declare @should_raise bit
+
+    set @should_raise = case
+        when datalength(isnull(trim(@a), '')) = 0 then 0
+        else 1
+    end
+
+    set @msg = case
+        when @a is null then N'value is null'
+        when @should_raise = 1 then N'value is not empty'
+        else N''
+    end
+
+    exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
+end
+go
+
+create or alter proc $(AssertSchema).IsMaxNullOrEmpty
+(
+    @a     nvarchar(max),
+    @label $(AssertSchema).label = null
+)
+as
+begin
+    set nocount on;
+
+    print 'SSTR_ASSERTION';
+
+    declare @sp sysname = object_name(@@procid)
+    declare @msg $(AssertSchema).assert_message
+    declare @should_raise bit
+
+    set @should_raise = case
+        when @a is null or @a = N'' then 0
+        else 1
+    end
+
+    set @msg = case
+        when @should_raise = 1 then N'value is not null or empty'
+        else N''
     end
 
     exec $(AssertSchema)._raise_if_required @sp, @should_raise, @msg, @label;
